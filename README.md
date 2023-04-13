@@ -70,3 +70,66 @@ The following types are supported by default:
 - The covariant versions of `list` and `map`, `collections.abc.Sequence` and `collections.abc.Mapping`, are also supported.
     - Consequently, `JsonType` is a valid type to deserialize to. If you want to do nothing to a member during deserialization, use `JsonType` as the type.
 
+## Serialization
+
+Implementations for serialization is provided. Some type loaders that are needed for deserialization do not have a corresponding serializer, such as `TypeVar` and `TypeAlias`, since  it would be unusual for an instance value to be these types.
+
+```py
+# ...
+from SlySerialize import to_json
+
+assert serialized == to_json(my_obj)
+
+```
+
+In most cases, `to_json` should be the inverse of `from_json`.
+
+## Custom Converters
+
+Custom converters can be created for any type. Subclass `Loader` or `Unloader`, or `Converter` for both. These have a generic argument for the domain type that they serialize to or from. For JSON, this is `JsonType`. Some of the loaders implemented by this library do not require a specific domain, so they may be combined with custom loaders for other domain types.
+
+Loaders must implement the following two methods:
+
+```py
+    def can_load(self, cls: type) -> bool: ...
+
+    def des(self, ctx: DesCtx[Domain], value: Domain, cls: type[MyType]) -> MyType: ...
+```
+
+And unloaders must implement:
+
+```py
+    def can_unload(self, cls: type) -> bool: ...
+
+    def ser(self, ctx: SerCtx[Domain], obj: MyType) -> Domain: ...
+```
+
+Where `DesCtx` and `SerCtx` are used to recursively call the top level converter being used.
+
+In most cases can_unload can be implemented in terms of can_load.
+
+The converters implemented by this library are available in `SlySerialize.COMMON_CONVERTERS`, which is a `ConverterCollection` that implements `Converter[JsonType]`.
+
+To use a custom converter, pass any `Converter`  to `from_json` or `to_json`:
+
+```py
+# ...
+
+custom_converter = COMMON_CONVERTERS.with_(MyConverter())
+
+thing = from_json(MyClass[int], serialized, custom_converter)
+```
+
+It is not strictly necessary to use a `ConverterCollection`.
+
+## Async Loaders
+
+Async loaders are supported. They must implement the following methods:
+
+```py
+    def can_load(self, cls: type) -> bool: ...
+
+    async def des(self, ctx: DesCtx[Domain], value: Domain, cls: type[MyType]) -> MyType: ...
+```
+
+When a loader is async or part of a `ConverterCollection`, then `from_json_async` must be used instead of `from_json` or an error will be raised. There is no async version of `to_json` nor any async version of `Unloader`.

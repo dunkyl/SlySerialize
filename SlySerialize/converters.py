@@ -127,17 +127,19 @@ class DictConverter(Converter[JsonType]):
             for k, v in value.items()
         }) # type: ignore - T is dict[str, vt]
     
-    def ser(self, ctx: SerCtx[JsonType], value: Any) -> JsonType:
+    def ser(self, ctx: SerCtx[JsonType], value: dict[str, Any]) -> JsonType:
         return { k: ctx.ser(v) for k, v in value.items() }
 
 class ListOrSetConverter(Converter[JsonType]):
     '''Converts lists and sets'''
+    ListOrSet = list[Any] | set[Any]
+
     def can_load(self, cls: type):
         return (get_origin(cls) or cls) in (list, set)
     
     def can_unload(self, cls: type): return self.can_load(cls)
     
-    def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
+    def des(self, ctx: JsonDCtx, value: JsonType, cls: type[ListOrSet]) -> ListOrSet:
         if not isinstance(value, list):
             raise mismatch(type(value), list)
         
@@ -147,7 +149,7 @@ class ListOrSetConverter(Converter[JsonType]):
             ctx.des(v, t) for v in value
         )
     
-    def ser(self, ctx: SerCtx[JsonType], value: Any) -> JsonType:
+    def ser(self, ctx: SerCtx[JsonType], value: ListOrSet) -> JsonType:
         return [ ctx.ser(v) for v in value ]
     
 class CollectionsAbcLoader(Loader[JsonType]):

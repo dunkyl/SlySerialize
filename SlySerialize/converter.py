@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from asyncio import locks
 import copy
 import functools
+import asyncio
 
 from typing import Any, Generic, TypeAlias
 
@@ -14,14 +15,18 @@ class LoadingContext(Generic[Domain]):
     parent_deserializer: 'Loader[Domain]'
     only_sync: bool
 
-    def __init__(self, converter: 'Loader[Domain]', only_sync: bool = False):
+    def __init__(self, converter: 'Loader[Domain]', only_sync: bool):
         self.type_vars = {}
         self.parent_type = None
         self.only_sync = only_sync
         self.parent_deserializer = converter
 
     def des(self, value: Domain, cls: type[T]) -> T:
-        return self.parent_deserializer.des(self, value, cls)
+        result = self.parent_deserializer.des(self, value, cls)
+        if self.only_sync:
+            if asyncio.isfuture(result) or asyncio.iscoroutine(result):
+                raise ValueError("Async converter used in sync context")
+        return result
     
 DesCtx: TypeAlias = LoadingContext[Domain]
 
@@ -118,7 +123,7 @@ class UnloaderCollection(Unloader[Domain]):
             raise TypeError(F"No unloader for {type(value)}")
         return ser.ser(ctx, value)
     
-class ConverterCollection(UnloaderCollection[Domain], LoaderCollection[Domain]):
+class ConverterCollection(UnloaderCollection[Domain], LoaderCollection[Domain], Converter[Domain]):
     '''Collection of many converters to handle many types at once'''
 
     def __init__(self, *converters: Converter[Domain], loaders: list[Loader[Domain]]|None = None, unloaders: list[Unloader[Domain]]|None = None):

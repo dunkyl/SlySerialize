@@ -25,3 +25,9 @@ def test_readme():
     }
 
     assert my_obj == from_json(MyClass[int], serialized)
+
+    # ...
+    
+    from SlySerialize import to_json
+
+    assert serialized == to_json(my_obj)
