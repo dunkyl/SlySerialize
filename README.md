@@ -47,7 +47,7 @@ assert my_obj == convert_from_json(MyClass[int], serialized)
 
 Type variables or mutually recursive types must be declared in the global scope if used in a delayed annotation.
 
-`JsonType` is an alias for the return type of `json.loads` (Python standard library), it represents the native JSON types.
+`SlySerialize.JsonType` is an alias for the return type of `json.loads` (Python standard library), it represents the native JSON types.
 
 Not all types are guaranteed to round-trip. For a simple example, `list` and `set` are both serialized as a JSON array, so if there is a union `list | set`, and an empty value, then the first case, `list`, will be selected during deserialization. Other examples would include `dict` and classes, or classes that have the same member names.
 
