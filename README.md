@@ -8,8 +8,10 @@ Key features:
 - Generic dataclasses and nested generics
 - Type aliases
 - Union types
+- Recursive types and delayed annotations
+- Custom deserialization
 - Asynchronous custom deserialization
-- Deserialization dependencies
+- Zero dependencies
 
 ## Basic usage
 
@@ -43,13 +45,21 @@ serialized = {
 assert my_obj == convert_from_json(MyClass[int], serialized)
 ```
 
+## Should I use this?
+
+The goal of this library is to handle deserialization cases for strongly typed dataclass and custom types, and to do so with as little code as possible.
+
+If you only want fast and customizable *serialization*, but maybe not deserialization, you should use a library like [orjson](https://pypi.org/project/orjson/).
+
+If you are using JSON-like types already, without generics or some other specific feature, there are also other libraries that will deserialize faster.
+
+The serialization format for JSON in this library also prefers succinctness at the cost of certain edge cases related to overlapping type representations. See the [Default Representations](#default-representations) section for more details.
+
 ## Notes
 
 Type variables or mutually recursive types must be declared in the global scope if used in a delayed annotation.
 
 `SlySerialize.JsonType` is an alias for the return type of `json.loads` (Python standard library), it represents the native JSON types.
-
-Not all types are guaranteed to round-trip. For a simple example, `list` and `set` are both serialized as a JSON array, so if there is a union `list | set`, and an empty value, then the first case, `list`, will be selected during deserialization. Other examples would include `dict` and classes, or classes that have the same member names.
 
 If the type is not supported, or if the representation was different than what was expected, a `TypeError` will be raised.
 
@@ -69,6 +79,8 @@ The following types are supported by default:
 - Generic types are substituted for their concrete type. If the type is not available, a `ValueError` is raised.
 - The covariant versions of `list` and `map`, `collections.abc.Sequence` and `collections.abc.Mapping`, are also supported.
     - Consequently, `JsonType` is a valid type to deserialize to. If you want to do nothing to a member during deserialization, use `JsonType` as the type.
+
+Not all types are guaranteed to round-trip. For a simple example, `list` and `set` are both serialized as a JSON array, so if there is a union `list | set`, and an empty value, then the first case, `list`, will be selected during deserialization. Other examples would include `dict` and classes, or classes that have the same member names.
 
 ## Serialization
 
@@ -132,4 +144,5 @@ Async loaders are supported. They must implement the following methods:
     async def des(self, ctx: DesCtx[Domain], value: Domain, cls: type[MyType]) -> MyType: ...
 ```
 
-When a loader is async or part of a `ConverterCollection`, then `from_json_async` must be used instead of `from_json` or an error will be raised. There is no async version of `to_json` nor any async version of `Unloader`.
+When a loader is async or part of a `ConverterCollection`, then `from_json_async` must be used instead of `from_json` or an error will be raised. There is no async version of `to_json` nor any async version of `Unloader`. It is OK to pass a `ConverterCollection` with async loaders to `to_json`, since it will only access converters that implement `Loader`.
+
