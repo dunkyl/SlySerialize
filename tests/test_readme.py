@@ -11,19 +11,17 @@ def test_readme():
     class MyClass(Generic[T]):
         aliased: ListOfInts
         generic: T
-        builtin: tuple[float, set[str]]
+        builtin: tuple[float, list[str]]
         union: dict[str, T] | None
         delayed: 'MyClass[T] | None'
 
-    my_obj = MyClass[int]([1, 2, 3], 42, (3.14, {"a", "b", "c"}), None, None)
+    my_obj = MyClass[int]([1, 2, 3], 42, (3.1, ["a"]), None, None)
 
-    # asdict(my_obj)
+    # dataclasses.asdict(my_obj)
     serialized = {
-        "aliased": [1, 2, 3],
-        "generic": 42,
-        "builtin": [3.14, ["a", "b", "c"]],
-        "union": None,
-        "delayed": None
+        "aliased": [1, 2, 3],   "generic": 42,
+        "union":   None,        "delayed": None,
+        "builtin": [3.1, ["a"]],
     }
 
     assert my_obj == convert_from_json(MyClass[int], serialized)

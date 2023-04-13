@@ -27,16 +27,16 @@ T = TypeVar("T")
 class MyClass(Generic[T]):
     aliased: ListOfIntegers
     generic: T
-    builtin: tuple[float, set[str]]
+    builtin: tuple[float, list[str]]
     union: dict[str, T] | None
     delayed: 'MyClass[T] | None'
 
-my_obj = MyClass[int]([1, 2, 3], 42, (3.1, {"a"}), None, None)
+my_obj = MyClass[int]([1, 2, 3], 42, (3.1, ["a"]), None, None)
 
 # dataclasses.asdict(my_obj)
 serialized = {
     "aliased": [1, 2, 3],   "generic": 42,
-    "union":   None,        "delayed": None
+    "union":   None,        "delayed": None,
     "builtin": [3.1, ["a"]],
 }
 
