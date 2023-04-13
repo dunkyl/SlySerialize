@@ -49,7 +49,9 @@ Type variables or mutually recursive types must be declared in the global scope 
 
 `JsonType` is an alias for the return type of `json.loads` (Python standard library), it represents the native JSON types.
 
-Not all types are guaranteed to round-trip. For a simple example, `list` and `set` are both serialized as a JSON array, so if there is a union `list | set`, and an empty value, then the first case, `list`, will be selected during deserialization. Other examples would include `dict` and `dataclass`, or classes that have the same member names.
+Not all types are guaranteed to round-trip. For a simple example, `list` and `set` are both serialized as a JSON array, so if there is a union `list | set`, and an empty value, then the first case, `list`, will be selected during deserialization. Other examples would include `dict` and classes, or classes that have the same member names.
+
+If the type is not supported, or if the representation was different than what was expected, a `TypeError` will be raised.
 
 ## Default Representations
 
