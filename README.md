@@ -53,6 +53,8 @@ Not all types are guaranteed to round-trip. For a simple example, `list` and `se
 
 If the type is not supported, or if the representation was different than what was expected, a `TypeError` will be raised.
 
+`dataclasses.asdict` only supports serializing dataclasses, `JsonType`, `tuple`, and lists, tuples, or dicts of these. There will not be an error, but, the return type is *not* `JsonType`. Other types will be passed through unaffected. If you want to serialize a dataclass with a member that is not one of these types, you may want to implement your own serialization.
+
 ## Default Representations
 
 The following types are supported by default:
