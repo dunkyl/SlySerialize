@@ -4,7 +4,7 @@ Convert JSON-like data structures into nice Python objects.
 
 Key features:
 
-- Common, built-in types like `set` and `tuple`
+- Common, built-in types like `set`, `tuple` and `Enum`
 - Generic dataclasses and nested generics
 - Type aliases
 - Union types
@@ -75,6 +75,7 @@ The following types are supported by default:
     - The default value type used with no arguments is `JsonType`
 - `tuple` and `set` as an array
 - Dataclasses as maps
+- Enum types of `str` or `int` as their value
 - Union types as whichever case the value would otherwise be represented as
 - Generic types are substituted for their concrete type. If the type is not available, a `ValueError` is raised.
 - The covariant versions of `list` and `map`, `collections.abc.Sequence` and `collections.abc.Mapping`, are also supported.
