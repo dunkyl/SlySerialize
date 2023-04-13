@@ -3,6 +3,7 @@ Extended support for deserialization of Python types from JSON
 '''
 from .converter import Converter, Converters, DesCtx
 from .converters import *
+from .asynch import recursive_await
 
 _basic = (
     JsonScalarConverter(),
@@ -38,13 +39,14 @@ def convert_from_json(cls: type[T], value: JsonTypeCo, \
 
     If not specified, uses the default converter.'''
     if converter is None:
-        converter = common_converter_unstrict
+        converter = common_converter_strict
     return DesCtx[JsonTypeCo](converter).des(value, cls)
 
-def convert_from_json_strict(cls: type[T], value: JsonTypeCo) -> T:
-    '''Converts a value from JSON to a type T.
-
-    Does not allow extra keys in dataclasses.
+async def convert_from_json_async(cls: type[T], value: JsonTypeCo, \
+                            converter: Converter[JsonTypeCo] | None = None) -> T:
+    '''Converts a value from JSON to a type T with support for async converters.
 
     If not specified, uses the default converter.'''
-    return DesCtx[JsonTypeCo](common_converter_strict).des(value, cls)
+    if converter is None:
+        converter = common_converter_strict
+    return await recursive_await(DesCtx[JsonTypeCo](converter).des(value, cls))
