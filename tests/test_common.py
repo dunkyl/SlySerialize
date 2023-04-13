@@ -6,7 +6,6 @@ from SlySerialize.jsontype import JsonType
 from SlySerialize.de import convert_from_json
 
 def test_de_simple():
-
     for x in (None, 1, 2.5, "hi", True):
         assert x == convert_from_json(type(x), x)
 
@@ -57,7 +56,7 @@ def test_de_generic_alias():
     x: ListSet[int] = ([1, 2, 2], {1, 2})
     assert x == convert_from_json(ListSet[int], list(map(list, x)))
 
-def test_de_generic_gerneric_arg():
+def test_de_generic_generic_arg():
     @dataclass
     class Test(Generic[T]):
         a: T
@@ -66,7 +65,7 @@ def test_de_generic_gerneric_arg():
     x = Test[list[int]]([1, 2, 3])
     assert x == convert_from_json(Test[list[int]], asdict(x))
 
-def test_de_delayed_gerneric():
+def test_de_delayed_generic():
     @dataclass
     class Test(Generic[T]):
         a: 'list[T]'
@@ -93,117 +92,74 @@ def test_de_datetime():
     assert x == convert_from_json(datetime, x.timestamp())
 
 @dataclass
-class Emoji:
-    '''https://docs.joinmastodon.org/entities/CustomEmoji/'''
+class SimpleDataclass:
     shortcode: str
-    url: str
-    static_url: str
     visible_in_picker: bool
-    category: str
 
 @dataclass
-class UserField:
-    'https://docs.joinmastodon.org/entities/Account/#Field'
-    name: str
-    value: str
-    verified_at: datetime
-
-@dataclass
-class User:
-    '''https://docs.joinmastodon.org/entities/Account/'''
-    id: str
+class NestedDataclass:
     username: str
-    acct: str
-    display_name: str
     locked: bool
-    bot: bool
     created_at: datetime
-    discoverable: bool
-    note: str
-    url: str
-    avatar: str
-    avatar_static: str
-    header: str
-    header_static: str
-    followers_count: int
-    following_count: int
-    statuses_count: int
-    last_status_at: datetime
-    emojis: list[Emoji]
-    fields: list[UserField]
+    emojis: list[SimpleDataclass]
+    fields: list[SimpleDataclass]
 
-class PrivacyDirect(Enum):
+class EnumExample(Enum):
     PUBLIC = "public"
     UNLISTED = "unlisted"
     PRIVATE = "private"
     DIRECT = "direct"
+
 @dataclass
-class _PostBase:
+class NestedDataclassWithRecursiveDelayedAnnotation:
     id: str
     created_at: str
-    account: User
-    visibility: PrivacyDirect
+    account: NestedDataclass
+    visibility: EnumExample
     sensitive: bool
     spoiler_text: str
     media_attachments: list[JsonType]
     application: JsonType|None
     mentions: list[JsonType]
     tags: list[JsonType]
-    emojis: list[Emoji]
+    emojis: list[SimpleDataclass]
     reblogs_count: int
     favourites_count: int
     replies_count: int
     url: str|None
     in_reply_to_id: str|None
     in_reply_to_account_id: str|None
-    reblog: 'Post|None'
+    reblog: 'DerivedDataclass|None'
     poll: JsonType|None
     card: JsonType|None
     language: str|None
     edited_at: str|None
 
-class Post(_PostBase):
-    '''A post, toot, tweet, or status'''
+@dataclass
+class DerivedDataclass(NestedDataclassWithRecursiveDelayedAnnotation):
     content: str
 
-
-def test_de_post():
+def test_de_derived():
 
     x: JsonType = {
-        'id': '109958407801025523', 'created_at': '2023-03-03T08:29:10.291Z',
+        'id': '109958407801025523', 
+        'created_at': '2023-03-03T08:29:10.291Z',
         'in_reply_to_id': None, 'in_reply_to_account_id': None,
         'sensitive': False, 'spoiler_text': '', 'visibility': 'public',
         'language': 'en',
-        'uri': \
-            'https://mastodon.skye.vg/users/dunkyl/statuses/109958407801025523',
         'url': 'https://mastodon.skye.vg/@dunkyl/109958407801025523', 
         'replies_count': 0, 'reblogs_count': 0, 'favourites_count': 0, 
-        'edited_at': None, 'favourited': False, 'reblogged': False,
-        'muted': False,'bookmarked': False, 'pinned': False, 'local_only': None, 'content': '<p>test 4</p>', 'filtered': [], 'reblog': None, 
+        'edited_at': None, 'content': '<p>test 4</p>', 'reblog': None, 
         'application': {
             'name': 'SlyMastodon Test', 
             'website': 'https://github.com/dunkyl/SlyMastodon'
         },
         'account': {
-            'id': '109289749579593700', 'username': 'dunkyl', 'acct': 'dunkyl',
-            'display_name': 'Dunkyl 🔣🔣', 'locked': False, 'bot': False,
-            'discoverable': True, 'group': False,
-            'created_at': '2022-11-05T00:00:00.000Z', 'note': '',
-            'url': 'https://mastodon.skye.vg/@dunkyl',
-            'avatar': \
-                'https://mastodon-cdn.skye.vg/accounts/avatars/109/289/749/579/593/700/original/1e2288841aab39a6.png',
-            'avatar_static': \
-                'https://mastodon-cdn.skye.vg/accounts/avatars/109/289/749/579/593/700/original/1e2288841aab39a6.png',
-            'header': \
-                'https://mastodon-cdn.skye.vg/accounts/headers/109/289/749/579/593/700/original/0b27b0466b0d259f.jpg',
-            'header_static': \
-                'https://mastodon-cdn.skye.vg/accounts/headers/109/289/749/579/593/700/original/0b27b0466b0d259f.jpg',
-            'followers_count': 5, 'following_count': 22, 'statuses_count': 31,
-            'last_status_at': '2023-03-03', 'noindex': False, 'emojis': [],
-            'roles': [], 'fields': []
+            'username': 'dunkyl', 'locked': False, 
+            'created_at': '2022-11-05T00:00:00.000Z', 'emojis': [], 'fields': []
         }, 
         'media_attachments': [], 'mentions': [], 'tags': [], 'emojis': [], 
-        'reactions': [], 'card': None, 'poll': None, 'quote': None
+        'card': None, 'poll': None,
     }
 
-    convert_from_json(Post|None, x)
+    convert_from_json(DerivedDataclass|None, x)

@@ -12,7 +12,7 @@ from .jsontype import JsonTypeCo, JsonType
 from .converter import Converter, DesCtx
 
 def mismatch(cls: type, expected: Any):
-    return ValueError(
+    return TypeError(
         F"Mismatch: expected type {cls} to be respresnted as {expected}")
 
 class JsonScalarConverter(Converter[JsonTypeCo]):
@@ -37,6 +37,11 @@ class FromJsonConverter(Converter[JsonTypeCo]):
     
 class DataclassConverter(Converter[JsonTypeCo]):
     '''Converts dataclasses'''
+    allow_extra_keys: bool
+
+    def __init__(self, allow_extra_keys: bool) -> None:
+        self.allow_extra_keys = allow_extra_keys
+
     def can_convert(self, cls: type) -> bool:
         return is_dataclass(get_origin(cls) or cls)
 
@@ -54,14 +59,22 @@ class DataclassConverter(Converter[JsonTypeCo]):
             }
             inner_ctx.type_vars = ctx.type_vars | defined_type_params
         inner_ctx.parent_type = dataclass
+
+        fields_ = fields(dataclass)
+
+        if not self.allow_extra_keys:
+            for key in value.keys():
+                if key not in {f.name for f in fields_}:
+                    raise TypeError(F"Unknown field {key} in {value}")
         
         return dataclass(**{
-            f.name: inner_ctx.parent_des(value[f.name], f.type)
-            for f in fields(cls)
+            f.name: inner_ctx.des(value[f.name], f.type)
+            for f in fields(dataclass)
         })
     
 class DictConverter(Converter[JsonTypeCo]):
     '''Converts dicts'''
+
     def can_convert(self, cls: type):
         return (get_origin(cls) or cls) is dict
     
@@ -75,7 +88,7 @@ class DictConverter(Converter[JsonTypeCo]):
             raise TypeError("dict with non-string keys is not supported")
         
         return dict({
-            k: ctx.parent_des(v, val_t)
+            k: ctx.des(v, val_t)
             for k, v in value.items()
         }) # type: ignore - T is dict[str, vt]
 
@@ -91,7 +104,7 @@ class ListOrSetConverter(Converter[JsonTypeCo]):
         concrete = get_origin(cls) or cls
         t, = get_args(cls) or (JsonType,)
         return concrete(
-            ctx.parent_des(v, t) for v in value
+            ctx.des(v, t) for v in value
         )
     
 class TupleConverter(Converter[JsonTypeCo]):
@@ -109,7 +122,7 @@ class TupleConverter(Converter[JsonTypeCo]):
             raise TypeError(F"Too few items in list {value} for {cls}") 
         
         return tuple(
-            ctx.parent_des(v, t) for v, t in zip(value, ts)
+            ctx.des(v, t) for v, t in zip(value, ts)
         ) # type: ignore - T is tuple[*ts]
     
 class TypeVarConverter(Converter[Domain]):
@@ -123,7 +136,7 @@ class TypeVarConverter(Converter[Domain]):
             raise ValueError(F"Unbound generic type variable {name} in {cls}")
         innerctx = copy.copy(ctx)
         innerctx.parent_type = cls
-        return ctx.parent_des(value, ctx.type_vars[name])
+        return ctx.des(value, ctx.type_vars[name])
     
 class UnionConverter(Converter[Domain]):
     '''Converts unions'''
@@ -134,12 +147,13 @@ class UnionConverter(Converter[Domain]):
         possible_types = get_args(cls)
         if type(value) in possible_types:
             return value # type: ignore - value is already of the correct type
+        attempt_errors: list[TypeError] = []
         for t in possible_types:
             try:
-                return ctx.parent_des(value, t)
-            except TypeError:
-                pass
-        raise TypeError(F"Failed to convert from {type(value)} to any of {possible_types}")
+                return ctx.des(value, t)
+            except TypeError as e:
+                attempt_errors.append(e)
+        raise TypeError(F"Failed to convert from {type(value)} to any of {possible_types}:\n" + "\n  ".join(str(e) for e in attempt_errors))
     
 class DatetimeConverter(Converter[JsonTypeCo]):
     '''Converts datetimes'''
@@ -175,5 +189,5 @@ class DelayedAnnotationConverter(Converter[Domain]):
         else:
             cls_globals = {}
         t = eval(cls, cls_globals) # type: ignore - cls is str
-        return ctx.parent_des(value, t)
+        return ctx.des(value, t)
     

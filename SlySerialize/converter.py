@@ -10,20 +10,20 @@ class DeserializtionContext(Generic[Domain]):
     '''State for deserialization and recursion'''
     type_vars: dict[str, type]
     parent_type: type | None
-    parent_converter: 'Converter[Domain]' | None
+    parent_converter: 'Converter[Domain] | None'
     only_sync: bool
 
-    def __init__(self, only_sync: bool = False):
+    def __init__(self, converter: 'Converter[Domain] | None' = None, only_sync: bool = False):
         self.type_vars = {}
         self.parent_type = None
-        self.parent_converter = None
         self.only_sync = only_sync
+        self.parent_converter = converter
 
     def submit_converter(self, converter: 'Converter[Domain]'):
         if self.parent_converter is None:
             self.parent_converter = converter
 
-    def parent_des(self, value: Domain, cls: type[T]) -> T:
+    def des(self, value: Domain, cls: type[T]) -> T:
         if self.parent_converter is None:
             raise TypeError(F"Cannot deserialize {cls} without parent converter")
         result = self.parent_converter.des(self, value, cls)
@@ -59,6 +59,7 @@ class Converters(Converter[Domain]):
     
     def des(self, ctx: DesCtx[Domain], value: Domain, cls: type[T]) -> T:
         converter = self.can_convert(cls)
+        print(F"Selected converter: {converter} for {type(value)}, {cls}")
         if converter is None:
             raise TypeError(F"Cannot convert {cls} to Json")
         ctx.submit_converter(self)
