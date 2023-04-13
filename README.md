@@ -13,6 +13,11 @@ Key features:
 - Asynchronous custom deserialization
 - Zero dependencies
 
+In just one line:
+```py
+assert myThing == from_json(MyClass[int], to_json(myThing))
+```
+
 ## Basic usage
 
 Call `convert_from_json` with a target type, with generic arguments, and some json data, such as returned from `json.loads`. Generic arguments are optional, but if you don't provide them, you'll get a `TypeError` if the target type requires them to be concrete. See the final line in the following example:
