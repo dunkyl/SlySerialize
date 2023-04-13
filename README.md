@@ -20,12 +20,12 @@ from typing import Generic, TypeVar, TypeAlias
 from dataclasses import dataclass
 from SlySerialize import convert_from_json
 
-ListOfInts: TypeAlias = list[int]
+ListOfIntegers: TypeAlias = list[int]
 T = TypeVar("T")
 
 @dataclass
 class MyClass(Generic[T]):
-    aliased: ListOfInts
+    aliased: ListOfIntegers
     generic: T
     builtin: tuple[float, set[str]]
     union: dict[str, T] | None
@@ -33,7 +33,7 @@ class MyClass(Generic[T]):
 
 my_obj = MyClass[int]([1, 2, 3], 42, (3.1, {"a"}), None, None)
 
-# asdict(my_obj)
+# dataclasses.asdict(my_obj)
 serialized = {
     "aliased": [1, 2, 3],   "generic": 42,
     "union":   None,        "delayed": None
@@ -47,4 +47,22 @@ assert my_obj == convert_from_json(MyClass[int], serialized)
 
 Type variables or mutually recursive types must be declared in the global scope if used in a delayed annotation.
 
-Not all types are guarunteed to round-trip. For a simple example, `list` and `set` are both serialized as a JSON array, so if there is a union `list[T|None] | set[U|None]`, and a value `{ None }`, then the first case, `list[T]`, will be selected during deserialization.
+`JsonType` is an alias for the return type of `json.loads` (Python standard library), it represents the native JSON types.
+
+Not all types are guaranteed to round-trip. For a simple example, `list` and `set` are both serialized as a JSON array, so if there is a union `list | set`, and an empty value, then the first case, `list`, will be selected during deserialization. Other examples would include `dict` and `dataclass`, or classes that have the same member names.
+
+## Default Representations
+
+The following types are supported by default:
+
+- `NoneType`, `bool`, `int`, `float`, and `str` as themselves
+- `list` and `dict` as arrays and maps, with or without their generic arguments
+    - `dict` is only supported if the key type is `str`
+    - The default value type used with no arguments is `JsonType`
+- `tuple` and `set` as an array
+- Dataclasses as maps
+- Union types as whichever case the value would otherwise be represented as
+- Generic types are substituted for their concrete type. If the type is not available, a `ValueError` is raised.
+- The covariant versions of `list` and `map`, `collections.abc.Sequence` and `collections.abc.Mapping`, are also supported.
+    - Consequently, `JsonType` is a valid type to deserialize to. If you want to do nothing to a member during deserialization, use `JsonType` as the type.
+
