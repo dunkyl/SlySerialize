@@ -1,0 +1,179 @@
+import copy
+import sys
+from datetime import datetime
+from enum import Enum
+import inspect
+from types import NoneType, UnionType
+from typing import TypeVar, Any, get_origin, get_args
+from dataclasses import is_dataclass, fields
+
+from .typevars import T, Domain
+from .jsontype import JsonTypeCo, JsonType
+from .converter import Converter, DesCtx
+
+def mismatch(cls: type, expected: Any):
+    return ValueError(
+        F"Mismatch: expected type {cls} to be respresnted as {expected}")
+
+class JsonScalarConverter(Converter[JsonTypeCo]):
+    '''Converts common scalar types'''
+    def can_convert(self, cls: type) -> bool:
+        return cls in (int, float, str, bool, NoneType)
+
+    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+        if isinstance(value, cls):
+            return value
+        raise mismatch(cls, type(value))
+    
+class FromJsonConverter(Converter[JsonTypeCo]):
+    '''Converts classes that have a `from_json` method'''
+
+    def can_convert(self, cls: type) -> bool:
+        return hasattr(cls, 'from_json')
+    
+    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+        result = getattr(cls, 'from_json')(value)
+        return result
+    
+class DataclassConverter(Converter[JsonTypeCo]):
+    '''Converts dataclasses'''
+    def can_convert(self, cls: type) -> bool:
+        return is_dataclass(get_origin(cls) or cls)
+
+    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+        if not isinstance(value, dict):
+            raise mismatch(type(value), dict)
+        dataclass = get_origin(cls) or cls
+        inner_ctx = copy.copy(ctx)
+        if origin := get_origin(cls):
+            targs = get_args(cls)
+            params: tuple[TypeVar, ...] = getattr(origin, '__parameters__')
+            defined_type_params = {
+                str(var): t # like ~T: int
+                for var, t in zip(params, targs)
+            }
+            inner_ctx.type_vars = ctx.type_vars | defined_type_params
+        inner_ctx.parent_type = dataclass
+        
+        return dataclass(**{
+            f.name: inner_ctx.parent_des(value[f.name], f.type)
+            for f in fields(cls)
+        })
+    
+class DictConverter(Converter[JsonTypeCo]):
+    '''Converts dicts'''
+    def can_convert(self, cls: type):
+        return (get_origin(cls) or cls) is dict
+    
+    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+        if not isinstance(value, dict):
+            raise mismatch(type(value), dict)
+        
+        key_t, val_t = get_args(cls) or (str, JsonType)
+
+        if key_t is not str:
+            raise TypeError("dict with non-string keys is not supported")
+        
+        return dict({
+            k: ctx.parent_des(v, val_t)
+            for k, v in value.items()
+        }) # type: ignore - T is dict[str, vt]
+
+class ListOrSetConverter(Converter[JsonTypeCo]):
+    '''Converts lists and sets'''
+    def can_convert(self, cls: type):
+        return (get_origin(cls) or cls) in (list, set)
+    
+    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+        if not isinstance(value, list):
+            raise mismatch(type(value), list)
+        
+        concrete = get_origin(cls) or cls
+        t, = get_args(cls) or (JsonType,)
+        return concrete(
+            ctx.parent_des(v, t) for v in value
+        )
+    
+class TupleConverter(Converter[JsonTypeCo]):
+    '''Converts tuples'''
+    def can_convert(self, cls: type):
+        return (get_origin(cls) or cls) is tuple
+    
+    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+        if not isinstance(value, list):
+            raise mismatch(type(value), list)
+        
+        ts = get_args(cls) or tuple(JsonType for _ in value)
+
+        if len(value) > len(ts):
+            raise TypeError(F"Too few items in list {value} for {cls}") 
+        
+        return tuple(
+            ctx.parent_des(v, t) for v, t in zip(value, ts)
+        ) # type: ignore - T is tuple[*ts]
+    
+class TypeVarConverter(Converter[Domain]):
+    '''Converts type variables inside of instances of generic types'''
+    def can_convert(self, cls: type):
+        return type(cls) is TypeVar
+    
+    def des(self, ctx: DesCtx[Domain], value: Domain, cls: type[T]) -> T:
+        name = str(cls)
+        if name not in ctx.type_vars:
+            raise ValueError(F"Unbound generic type variable {name} in {cls}")
+        innerctx = copy.copy(ctx)
+        innerctx.parent_type = cls
+        return ctx.parent_des(value, ctx.type_vars[name])
+    
+class UnionConverter(Converter[Domain]):
+    '''Converts unions'''
+    def can_convert(self, cls: type):
+        return type(cls) is UnionType
+    
+    def des(self, ctx: DesCtx[Domain], value: Domain, cls: type[T]) -> T:
+        possible_types = get_args(cls)
+        if type(value) in possible_types:
+            return value # type: ignore - value is already of the correct type
+        for t in possible_types:
+            try:
+                return ctx.parent_des(value, t)
+            except TypeError:
+                pass
+        raise TypeError(F"Failed to convert from {type(value)} to any of {possible_types}")
+    
+class DatetimeConverter(Converter[JsonTypeCo]):
+    '''Converts datetimes'''
+    def can_convert(self, cls: type):
+        return cls is datetime
+    
+    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[datetime]) -> datetime:
+        if isinstance(value, str):
+            return datetime.fromisoformat(value)
+        elif isinstance(value, (int, float)):
+            return datetime.fromtimestamp(value)
+        else:
+            raise mismatch(type(value), str|int|float)
+
+class EnumConverter(Converter[JsonTypeCo]):
+    '''Converts string or integer enums'''
+    def can_convert(self, cls: type):
+        return inspect.isclass(cls) and issubclass(cls, Enum)
+    
+    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+        if not isinstance(value, (str, int)):
+            raise mismatch(type(value), str|int)
+        return cls(value)
+
+class DelayedAnnotationConverter(Converter[Domain]):
+    '''Converts delayed annotations (string annotations)'''
+    def can_convert(self, cls: type):
+        return type(cls) is str
+    
+    def des(self, ctx: DesCtx[Domain], value: Domain, cls: type[T]) -> T:
+        if ctx.parent_type is not None:
+            cls_globals = vars(sys.modules[ctx.parent_type.__module__])
+        else:
+            cls_globals = {}
+        t = eval(cls, cls_globals) # type: ignore - cls is str
+        return ctx.parent_des(value, t)
+    

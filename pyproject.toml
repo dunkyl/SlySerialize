@@ -1,0 +1,34 @@
+[project]
+name = "SlySerialize"
+version = "0.0.1"
+description = "Convert JSON-like data structures into nice Python objects."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file="LICENSE" }
+authors = [{name="Dunkyl 🔣🔣"}]
+dependencies = []
+[project.optional-dependencies]
+dev = [
+    # testing
+    'pytest', 'pytest-asyncio',
+
+    # docs
+    'sphinx',
+    'myst-parser',
+    'furo',
+    'sphinxcontrib-trio',
+    'sphinx-copybutton',
+    'sphinxext-opengraph'
+]
+
+[project.urls]
+Homepage = "https://github.com/dunkyl/SlySerialize"
+Repository = "https://github.com/dunkyl/SlySerialize"
+Documentation = "https://docs.dunkyl.net/SlySerialize"
+"Bug Tracker" = "https://github.com/dunkyl/SlySerialize/issues"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
