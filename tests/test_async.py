@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import dataclass
 from SlySerialize.converter import LoaderCollection, DesCtx
 from SlySerialize.converters import DataclassConverter, JsonScalarConverter, ListOrSetConverter
-from SlySerialize.de import from_json
+from SlySerialize.de import from_json_async
 
 from SlySerialize.asynch import recursive_await, AsyncLoader
 
@@ -35,9 +35,7 @@ class MemberRequiresAsync:
 
 async def test_async_from_json():
     x = MemberRequiresAsync(RequiresAsync(1))
-    x_pending = from_json(MemberRequiresAsync, x.to_json())
-    print(x_pending)
-    x_de = await recursive_await(x_pending)
+    x_de = await from_json_async(MemberRequiresAsync, x.to_json())
     assert x == x_de
 
 class MyAsync2:
@@ -84,9 +82,7 @@ async def test_async_converter():
 
     x = MyAsync2(3.5, MyAsync2(2.5, MyAsync2(1.5, None)))
 
-    x_pending = from_json(MyAsync2, json, loader=MyClass2Loader())
-
-    x_de = await recursive_await(x_pending)
+    x_de = await from_json_async(MyAsync2, json, loader=MyClass2Loader())
 
     assert x == x_de
 
@@ -116,9 +112,6 @@ async def test_async_converter_nested():
         DataclassConverter(False),
         MyClass2Loader()
     )
-
-    x_pending = from_json(MyData, json, loader=loader)
-
-    x_de = await recursive_await(x_pending)
+    x_de = await from_json_async(MyData, json, loader=loader)
 
     assert x == x_de

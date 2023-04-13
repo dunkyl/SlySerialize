@@ -50,9 +50,14 @@ def from_json(cls: type[T], value: JsonType, \
     return context.des(value, cls)
 
 async def from_json_async(cls: type[T], value: JsonType,
-                            loader: Converter[JsonType]) -> T:
+                            loader: Loader[JsonType] | None = None,
+                            allow_extra_keys: bool=False) -> T:
     '''Converts a value from JSON to a type T with support for async converters.'''
-
+    if loader is None:
+        if allow_extra_keys:
+            loader = COMMON_CONVERTER_UNSTRICT
+        else:
+            loader = COMMON_CONVERTER
     return await recursive_await(DesCtx[JsonType](loader, only_sync=False).des(value, cls))
 
 def to_json(value: Any, converter: Converter[JsonType]|None=None) -> JsonType:
