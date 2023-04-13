@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from asyncio import locks
+import copy
 
 from typing import Generic, TypeAlias
 
@@ -50,6 +51,11 @@ class Converters(Converter[Domain]):
 
     def add(self, converter: Converter[Domain]):
         self.converters.append(converter)
+
+    def with_(self, *converters: Converter[Domain]):
+        new = copy.deepcopy(self)
+        new.converters.extend(converters)
+        return new
 
     def can_convert(self, cls: type) -> Converter[Domain] | None:
         for converter in self.converters:
