@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar, TypeAlias
 from dataclasses import dataclass
-from SlySerialize import convert_from_json
+from SlySerialize import from_json
 
 ListOfInts: TypeAlias = list[int]
 T = TypeVar("T")
@@ -24,4 +24,4 @@ def test_readme():
         "builtin": [3.1, ["a"]],
     }
 
-    assert my_obj == convert_from_json(MyClass[int], serialized)
+    assert my_obj == from_json(MyClass[int], serialized)

@@ -4,9 +4,9 @@ import asyncio
 from dataclasses import is_dataclass, fields
 
 from .typevars import T, Domain
-from .converter import DesCtx, Converter
+from .converter import DesCtx, Loader
 
-class AsyncConverter(Converter[Domain]):
+class AsyncConverter(Loader[Domain]):
     '''Deserializes one type or group of types asynchronously'''
 
     @abstractmethod

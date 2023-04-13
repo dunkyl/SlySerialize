@@ -4,27 +4,27 @@ from datetime import datetime
 from typing import Generic, TypeVar
 from SlySerialize.converter import Converter, DesCtx
 from SlySerialize.jsontype import JsonType
-from SlySerialize.de import convert_from_json, COMMON_CONVERTER, convert_from_json_unstrict
+from SlySerialize.de import from_json, COMMON_CONVERTER, convert_from_json_unstrict
 
 def test_de_simple():
     for x in (None, 1, 2.5, "hi", True):
-        assert x == convert_from_json(type(x), x)
+        assert x == from_json(type(x), x)
 
 def test_de_list():
     x: list[JsonType] = [1, 2, 3]
-    assert x == convert_from_json(list[int], x)
+    assert x == from_json(list[int], x)
 
 def test_de_set():
     x = {1, 2, 3}
-    assert x == convert_from_json(set[int], list(x))
+    assert x == from_json(set[int], list(x))
 
 def test_de_tuple():
     x = (1, 2.5, "hi")
-    assert x == convert_from_json(tuple[int, float, str], list(x))
+    assert x == from_json(tuple[int, float, str], list(x))
 
 def test_de_dict():
     x: JsonType = {"a": 1, "b": 2, "c": 3}
-    assert x == convert_from_json(dict[str, int], x)
+    assert x == from_json(dict[str, int], x)
 
 def test_de_enum():
     class Test(Enum):
@@ -32,11 +32,11 @@ def test_de_enum():
         B = 2
 
     x = Test.A
-    assert x == convert_from_json(Test, x.value)
+    assert x == from_json(Test, x.value)
 
 def test_de_union():
     x = 1
-    assert x == convert_from_json(int | str, x)
+    assert x == from_json(int | str, x)
 
 def test_de_dataclass():
     @dataclass
@@ -46,7 +46,7 @@ def test_de_dataclass():
         c: JsonType
 
     x = Test(1, "hi", {'x': 1, 'y': {}, 'z': [None, 2.5]})
-    assert x == convert_from_json(Test, asdict(x))
+    assert x == from_json(Test, asdict(x))
 
 T = TypeVar('T')
 U = TypeVar('U')
@@ -55,16 +55,16 @@ ListSet = tuple[list[T], set[T]]
 
 def test_de_generic_alias():
     x: ListSet[int] = ([1, 2, 2], {1, 2})
-    assert x == convert_from_json(ListSet[int], list(map(list, x)))
+    assert x == from_json(ListSet[int], list(map(list, x)))
 
 def test_de_generic_generic_arg():
     @dataclass
     class Test(Generic[T]):
         a: T
     x = Test[Test[int]](Test[int](1))
-    assert x == convert_from_json(Test[Test[int]], asdict(x))
+    assert x == from_json(Test[Test[int]], asdict(x))
     x = Test[list[int]]([1, 2, 3])
-    assert x == convert_from_json(Test[list[int]], asdict(x))
+    assert x == from_json(Test[list[int]], asdict(x))
 
 def test_de_delayed_generic():
     @dataclass
@@ -72,9 +72,9 @@ def test_de_delayed_generic():
         a: 'list[T]'
         b: 'T'
     x = Test[Test[int]]([Test[int]([1], 2)], Test[int]([3], 4))
-    assert x == convert_from_json(Test[Test[int]], asdict(x))
+    assert x == from_json(Test[Test[int]], asdict(x))
     x = Test[list[int]]([[1, 2, 3]], [])
-    assert x == convert_from_json(Test[list[int]], asdict(x))
+    assert x == from_json(Test[list[int]], asdict(x))
 
 def test_de_dataclass_generic():
 
@@ -85,12 +85,12 @@ def test_de_dataclass_generic():
         c: dict[str, T]
 
     x = Test[int](1, [2, 3], {'x': 1, 'y': 2, 'z': 3})
-    assert x == convert_from_json(Test[int], asdict(x))
+    assert x == from_json(Test[int], asdict(x))
 
 def test_de_datetime():
     x = datetime.now()
-    assert x == convert_from_json(datetime, x.isoformat())
-    assert x == convert_from_json(datetime, x.timestamp())
+    assert x == from_json(datetime, x.isoformat())
+    assert x == from_json(datetime, x.timestamp())
 
 @dataclass
 class SimpleDataclass:
@@ -163,7 +163,7 @@ def test_de_derived():
         'card': None, 'poll': None,
     }
 
-    convert_from_json(DerivedDataclass|None, x)
+    from_json(DerivedDataclass|None, x)
 
 
 def test_custom_converter():
@@ -177,7 +177,7 @@ def test_custom_converter():
 
     class XConverter(Converter[JsonType]):
 
-        def can_convert(self, cls: type): return cls is X
+        def can_load(self, cls: type): return cls is X
 
         def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[X]) -> X:
             if not isinstance(value, int):
@@ -188,7 +188,7 @@ def test_custom_converter():
 
     x = [X(1)]
 
-    x_de = convert_from_json(list[X], [1], converter=converter)
+    x_de = from_json(list[X], [1], converter=converter)
 
     assert x == x_de
 

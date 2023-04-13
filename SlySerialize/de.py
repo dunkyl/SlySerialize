@@ -1,61 +1,56 @@
 '''
 Extended support for deserialization of Python types from JSON
 '''
-from .converter import Converter, Converters, DesCtx
+from .converter import Loader, LoaderCollection, DesCtx
 from .converters import *
 from .asynch import recursive_await
 
 _basic = (
     JsonScalarConverter(),
-    ListOrSetConverter(),
-    CollectionsAbcConverter(),
-    TupleConverter(),
-    DictConverter(),
-    FromJsonConverter(),
+    ListOrSetLoader(),
+    CollectionsAbcLoader(),
+    TupleLoader(),
+    DictLoader(),
+    FromJsonLoader(),
 )
 
-COMMON_CONVERTER = Converters(
+COMMON_CONVERTER = LoaderCollection(
     *_basic,
-    DataclassConverter(False),
-    EnumConverter(),
-    DatetimeConverter(),
-    TypeVarConverter(),
-    UnionConverter(),
-    DelayedAnnotationConverter(),
+    DataclassLoader(False),
+    EnumLoader(),
+    DatetimeLoader(),
+    TypeVarLoader(),
+    UnionLoader(),
+    DelayedAnnotationLoader(),
 )
 
-COMMON_CONVERTER_UNSTRICT = Converters(
+COMMON_CONVERTER_UNSTRICT = LoaderCollection(
     *_basic,
-    DataclassConverter(True),
-    EnumConverter(),
-    DatetimeConverter(),
-    TypeVarConverter(),
-    UnionConverter(),
-    DelayedAnnotationConverter(),
+    DataclassLoader(True),
+    EnumLoader(),
+    DatetimeLoader(),
+    TypeVarLoader(),
+    UnionLoader(),
+    DelayedAnnotationLoader(),
 )
 
-def convert_from_json(cls: type[T], value: JsonType, \
-                      converter: Converter[JsonType] | None = None) -> T:
+def from_json(cls: type[T], value: JsonType, \
+                      loader: Loader[JsonType] | None = None,
+                      allow_extra_keys: bool=False) -> T:
     '''Converts a value from JSON to a type T.
 
     If not specified, uses the default converter.'''
-    if converter is None:
-        converter = COMMON_CONVERTER
-    context = DesCtx[JsonType](converter)
+    if loader is None:
+        if allow_extra_keys:
+            loader = COMMON_CONVERTER_UNSTRICT
+        else:
+            loader = COMMON_CONVERTER
+    context = DesCtx[JsonType](loader)
     context.parent_type = cls
     return context.des(value, cls)
 
-def convert_from_json_unstrict(cls: type[T], value: JsonType, ) -> T:
-    '''Converts a value from JSON to a type T.
+async def from_json_async(cls: type[T], value: JsonType,
+                            loader: Loader[JsonType]) -> T:
+    '''Converts a value from JSON to a type T with support for async converters.'''
 
-    Uses the default converter and allows unused fields for dataclasses.'''
-    return convert_from_json(cls, value, COMMON_CONVERTER_UNSTRICT)
-
-async def convert_from_json_async(cls: type[T], value: JsonType, \
-                            converter: Converter[JsonType] | None = None) -> T:
-    '''Converts a value from JSON to a type T with support for async converters.
-
-    If not specified, uses the default converter.'''
-    if converter is None:
-        converter = COMMON_CONVERTER
-    return await recursive_await(DesCtx[JsonType](converter).des(value, cls))
+    return await recursive_await(DesCtx[JsonType](loader).des(value, cls))
