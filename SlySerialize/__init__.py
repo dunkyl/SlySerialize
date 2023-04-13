@@ -2,7 +2,6 @@ from .de import \
     COMMON_CONVERTER as COMMON_CONVERTER, \
     COMMON_CONVERTER_UNSTRICT as COMMON_CONVERTER_UNSTRICT, \
     from_json as from_json, \
-    convert_from_json_unstrict as convert_from_json_unstrict, \
     from_json_async as from_json_async
 
 from .converter import \

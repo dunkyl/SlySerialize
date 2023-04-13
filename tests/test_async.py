@@ -4,7 +4,7 @@ from SlySerialize.converter import LoaderCollection, DesCtx
 from SlySerialize.converters import DataclassConverter, JsonScalarConverter, ListOrSetConverter
 from SlySerialize.de import from_json
 
-from SlySerialize.asynch import recursive_await, AsyncConverter
+from SlySerialize.asynch import recursive_await, AsyncLoader
 
 from SlySerialize.jsontype import JsonType
 
@@ -64,7 +64,7 @@ class MyAsync2:
                self.thing == other.thing and \
                 self.next == other.next
 
-class MyClass2Converter(AsyncConverter[JsonType]):
+class MyClass2Loader(AsyncLoader[JsonType]):
 
     def can_load(self, cls: type):
         return cls is MyAsync2
@@ -84,7 +84,7 @@ async def test_async_converter():
 
     x = MyAsync2(3.5, MyAsync2(2.5, MyAsync2(1.5, None)))
 
-    x_pending = from_json(MyAsync2, json, converter=MyClass2Converter())
+    x_pending = from_json(MyAsync2, json, loader=MyClass2Loader())
 
     x_de = await recursive_await(x_pending)
 
@@ -110,14 +110,14 @@ async def test_async_converter_nested():
         [MyAsync2(5.5, MyAsync2(5.5, None)), MyAsync2(4.5, MyAsync2(4.5, None))]
     )
 
-    converter = LoaderCollection(
+    loader = LoaderCollection(
         JsonScalarConverter(),
         ListOrSetConverter(),
         DataclassConverter(False),
-        MyClass2Converter()
+        MyClass2Loader()
     )
 
-    x_pending = from_json(MyData, json, converter=converter)
+    x_pending = from_json(MyData, json, loader=loader)
 
     x_de = await recursive_await(x_pending)
 

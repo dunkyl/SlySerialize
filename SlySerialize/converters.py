@@ -12,7 +12,7 @@ import typing
 
 from .typevars import T, U, Domain
 from .jsontype import JsonType
-from .converter import Loader, Unloader, DesCtx, Converter
+from .converter import Converter, Unloader, DesCtx, SerCtx, Loader
 
 JsonDCtx = DesCtx[JsonType]
 
@@ -35,9 +35,9 @@ class JsonScalarConverter(Converter[JsonType]):
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
         return expect_type(value, cls)
     
-    def ser(self, value: Any) -> JsonType: return value
+    def ser(self, ctx: SerCtx[JsonType], value: Any) -> JsonType: return value
     
-class FromJsonLoader(Loader[JsonType]):
+class FromJsonLoader(Converter[JsonType]):
     '''Converts classes that have a `from_json` method'''
 
     def can_load(self, cls: type) -> bool:
@@ -49,25 +49,17 @@ class FromJsonLoader(Loader[JsonType]):
 class ToJsonUnloader(Unloader[JsonType]):
     '''Converts classes that have a `to_json` method'''
 
-    def can_load(self, cls: type) -> bool:
+    def can_unload(self, cls: type) -> bool:
         return hasattr(cls, 'to_json')
     
-    def ser(self, value: Any) -> JsonType:
+    def ser(self, ctx: SerCtx[JsonType], value: Any) -> JsonType:
         return getattr(value, 'to_json')()
     
-class ToFromJsonConverter(Converter[JsonType]):
+class ToFromJsonConverter(ToJsonUnloader, FromJsonLoader, Converter[JsonType]):
     '''Converts classes that have both `from_json` and `to_json` methods'''
-
-    def can_load(self, cls: type) -> bool:
-        return hasattr(cls, 'to_json') and hasattr(cls, 'from_json')
+    pass
     
-    def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
-        return getattr(cls, 'from_json')(value)
-    
-    def ser(self, value: Any) -> JsonType:
-        return getattr(value, 'to_json')()
-    
-class DataclassLoader(Loader[JsonType]):
+class DataclassConverter(Converter[JsonType]):
     '''Converts dataclasses'''
     allow_extra: bool
 
@@ -76,6 +68,8 @@ class DataclassLoader(Loader[JsonType]):
 
     def can_load(self, cls: type) -> bool:
         return is_dataclass(get_origin(cls) or cls)
+    
+    def can_unload(self, cls: type) -> bool: return self.can_load(cls)
 
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, dict):
@@ -108,30 +102,40 @@ class DataclassLoader(Loader[JsonType]):
             for f in fields(dataclass)
         })
     
-class DictLoader(Loader[JsonType]):
-    '''Converts dicts'''
+    def ser(self, ctx: SerCtx[JsonType], value: Any) -> JsonType:
+        return {
+            f.name: ctx.ser(getattr(value, f.name))
+            for f in fields(value)
+        }
+    
+class DictConverter(Converter[JsonType]):
+    '''Converts dicts with string keys'''
 
     def can_load(self, cls: type):
-        return (get_origin(cls) or cls) is dict
+        return (get_origin(cls) or cls) is dict and ((get_args(cls) or (str,))[0] is str)
+    
+    def can_unload(self, cls: type): return self.can_load(cls)
     
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, dict):
             raise mismatch(type(value), dict)
         
-        key_t, val_t = get_args(cls) or (str, JsonType)
-
-        if key_t is not str:
-            raise TypeError("dict with non-string keys is not supported")
+        _, val_t = get_args(cls) or (str, JsonType)
         
         return dict({
             k: ctx.des(v, val_t)
             for k, v in value.items()
         }) # type: ignore - T is dict[str, vt]
+    
+    def ser(self, ctx: SerCtx[JsonType], value: Any) -> JsonType:
+        return { k: ctx.ser(v) for k, v in value.items() }
 
-class ListOrSetLoader(Loader[JsonType]):
+class ListOrSetConverter(Converter[JsonType]):
     '''Converts lists and sets'''
     def can_load(self, cls: type):
         return (get_origin(cls) or cls) in (list, set)
+    
+    def can_unload(self, cls: type): return self.can_load(cls)
     
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, list):
@@ -142,6 +146,9 @@ class ListOrSetLoader(Loader[JsonType]):
         return concrete(
             ctx.des(v, t) for v in value
         )
+    
+    def ser(self, ctx: SerCtx[JsonType], value: Any) -> JsonType:
+        return [ ctx.ser(v) for v in value ]
     
 class CollectionsAbcLoader(Loader[JsonType]):
 
@@ -167,10 +174,12 @@ class CollectionsAbcLoader(Loader[JsonType]):
                 for k, v in value.items()
             } # type: ignore - T is Map[str, vt], dict implements Map
     
-class TupleLoader(Loader[JsonType]):
+class TupleConverter(Converter[JsonType]):
     '''Converts tuples'''
     def can_load(self, cls: type):
         return (get_origin(cls) or cls) is tuple
+    
+    def can_unload(self, cls: type): return self.can_load(cls)
     
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, list):
@@ -185,6 +194,9 @@ class TupleLoader(Loader[JsonType]):
             ctx.des(v, t) for v, t in zip(value, ts)
         ) # type: ignore - T is tuple[*ts]
     
+    def ser(self, ctx: SerCtx[JsonType], value: Any) -> JsonType:
+        return [ ctx.ser(v) for v in value ]
+    
 class TypeVarLoader(Loader[Domain]):
     '''Converts type variables inside of instances of generic types'''
     def can_load(self, cls: type):
@@ -194,8 +206,8 @@ class TypeVarLoader(Loader[Domain]):
         name = str(cls)
         if name not in ctx.type_vars:
             raise ValueError(F"Unbound generic type variable {name} in {cls}")
-        innerctx = copy.copy(ctx)
-        innerctx.parent_type = cls
+        rec_ctx = copy.copy(ctx)
+        rec_ctx.parent_type = cls
         return ctx.des(value, ctx.type_vars[name])
     
 class UnionLoader(Loader[Domain]):
@@ -215,10 +227,12 @@ class UnionLoader(Loader[Domain]):
                 attempt_errors.append(e)
         raise TypeError(F"Failed to convert from {type(value)} to any of {possible_types}:\n" + "\n  ".join(str(e) for e in attempt_errors))
     
-class DatetimeLoader(Loader[JsonType]):
+class DatetimeConverter(Converter[JsonType]):
     '''Converts datetimes'''
     def can_load(self, cls: type):
         return cls is datetime
+    
+    def can_unload(self, cls: type): return self.can_load(cls)
     
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[datetime]) -> datetime:
         if isinstance(value, str):
@@ -227,16 +241,24 @@ class DatetimeLoader(Loader[JsonType]):
             return datetime.fromtimestamp(value)
         else:
             raise mismatch(type(value), str|int|float)
+        
+    def ser(self, ctx: SerCtx[JsonType], value: datetime) -> JsonType:
+        return value.isoformat()
 
-class EnumLoader(Loader[JsonType]):
+class EnumConverter(Converter[JsonType]):
     '''Converts string or integer enums'''
     def can_load(self, cls: type):
         return inspect.isclass(cls) and issubclass(cls, Enum)
+    
+    def can_unload(self, cls: type): return self.can_load(cls)
     
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, (str, int)):
             raise mismatch(type(value), str|int)
         return cls(value)
+    
+    def ser(self, ctx: SerCtx[JsonType], value: Enum) -> JsonType:
+        return value.value
 
 class DelayedAnnotationLoader(Loader[Domain]):
     '''Converts delayed annotations (string annotations)'''

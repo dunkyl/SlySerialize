@@ -7,32 +7,35 @@ from typing import Any, Generic, TypeAlias
 
 from .typevars import *
 
-
 class LoadingContext(Generic[Domain]):
     '''State for deserialization and recursion'''
     type_vars: dict[str, type]
     parent_type: type | None
-    parent_deserializer: 'Loader[Domain] | None'
+    parent_deserializer: 'Loader[Domain]'
     only_sync: bool
 
-    def __init__(self, converter: 'Loader[Domain] | None' = None, only_sync: bool = False):
+    def __init__(self, converter: 'Loader[Domain]', only_sync: bool = False):
         self.type_vars = {}
         self.parent_type = None
         self.only_sync = only_sync
         self.parent_deserializer = converter
 
-    def submit_converter(self, converter: 'Loader[Domain]'):
-        if self.parent_deserializer is None:
-            self.parent_deserializer = converter
-
     def des(self, value: Domain, cls: type[T]) -> T:
-        if self.parent_deserializer is None:
-            raise TypeError(F"Cannot deserialize {cls} without parent converter")
-        result = self.parent_deserializer.des(self, value, cls)
-        return result
+        return self.parent_deserializer.des(self, value, cls)
     
 DesCtx: TypeAlias = LoadingContext[Domain]
 
+class UnloadingContext(Generic[Domain]):
+    '''State for serialization and recursion'''
+    parent_serializer: 'Unloader[Domain]'
+
+    def __init__(self, converter: 'Unloader[Domain]'):
+        self.parent_serializer = converter
+
+    def ser(self, value: Any) -> Domain:
+        return self.parent_serializer.ser(self, value)
+    
+SerCtx: TypeAlias = UnloadingContext[Domain]
 
 class Unloader(ABC, Generic[Domain]):
     '''Serializes one type or group of types'''
@@ -41,7 +44,7 @@ class Unloader(ABC, Generic[Domain]):
     def can_unload(self, cls: type) -> bool: pass
 
     @abstractmethod
-    def ser(self, value: Any) -> Domain: ...
+    def ser(self, ctx: SerCtx[Domain], value: Any) -> Domain: ...
 
 class Loader(ABC, Generic[Domain]):
     '''Deserializes one type or group of types'''
@@ -56,7 +59,6 @@ class Loader(ABC, Generic[Domain]):
 class Converter(Unloader[Domain], Loader[Domain]):
     '''Both serializes and deserializes one type or group of types'''
     pass
-    
 
 class LoaderCollection(Loader[Domain]):
     '''Collection of many loaders to handle many types at once'''
@@ -85,9 +87,9 @@ class LoaderCollection(Loader[Domain]):
         print(F"Selected converter: {des} for {type(value)}, {cls}")
         if des is None:
             raise TypeError(F"No loader for {cls}")
-        ctx.submit_converter(self)
         return des.des(ctx, value, cls)
-    
+
+
 class UnloaderCollection(Unloader[Domain]):
     '''Collection of many unloaders to handle many types at once'''
     unloaders: list[Unloader[Domain]]
@@ -100,7 +102,7 @@ class UnloaderCollection(Unloader[Domain]):
         new.unloaders.extend(unloaders)
         return new
 
-    def can_load(self, cls: type) -> bool:
+    def can_unload(self, cls: type) -> bool:
         return bool(self.find_unloader(cls))
     
     @functools.lru_cache(maxsize=128)
@@ -110,11 +112,34 @@ class UnloaderCollection(Unloader[Domain]):
                 return c
         return None
     
-    def ser(self, value: object) -> Domain:
+    def ser(self, ctx: SerCtx[Domain], value: object) -> Domain:
         ser = self.find_unloader(type(value))
         if ser is None:
             raise TypeError(F"No unloader for {type(value)}")
-        return ser.ser(value)
+        return ser.ser(ctx, value)
+    
+class ConverterCollection(UnloaderCollection[Domain], LoaderCollection[Domain]):
+    '''Collection of many converters to handle many types at once'''
+
+    def __init__(self, *converters: Converter[Domain], loaders: list[Loader[Domain]]|None = None, unloaders: list[Unloader[Domain]]|None = None):
+        self.unloaders = []
+        self.loaders = []
+        for c in converters:
+            self.unloaders.append(c)
+            self.loaders.append(c)
+        for l in loaders or []:
+            self.loaders.append(l)
+        for u in unloaders or []:
+            self.unloaders.append(u)
+
+    def with_(self, *converters: Unloader[Domain]|Loader[Domain]):
+        new = copy.deepcopy(self)
+        for c in converters:
+            if isinstance(c, Unloader):
+                new.unloaders.append(c)
+            if isinstance(c, Loader):
+                new.loaders.append(c)
+        return new
     
 class PleaseWaitConverters(LoaderCollection[Domain]):
     '''Delays all conversions until complete() is called once.

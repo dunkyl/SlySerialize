@@ -6,7 +6,7 @@ from dataclasses import is_dataclass, fields
 from .typevars import T, Domain
 from .converter import DesCtx, Loader
 
-class AsyncConverter(Loader[Domain]):
+class AsyncLoader(Loader[Domain]):
     '''Deserializes one type or group of types asynchronously'''
 
     @abstractmethod

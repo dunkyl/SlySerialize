@@ -2,9 +2,9 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from datetime import datetime
 from typing import Generic, TypeVar
-from SlySerialize.converter import Converter, DesCtx
+from SlySerialize.converter import Loader, DesCtx
 from SlySerialize.jsontype import JsonType
-from SlySerialize.de import from_json, COMMON_CONVERTER, convert_from_json_unstrict
+from SlySerialize.de import from_json, COMMON_CONVERTER
 
 def test_de_simple():
     for x in (None, 1, 2.5, "hi", True):
@@ -175,7 +175,7 @@ def test_custom_converter():
         def __eq__(self, other: object):
             return isinstance(other, X) and self.xx == other.xx
 
-    class XConverter(Converter[JsonType]):
+    class XLoader(Loader[JsonType]):
 
         def can_load(self, cls: type): return cls is X
 
@@ -184,11 +184,11 @@ def test_custom_converter():
                 raise ValueError(f"expected int, got {value!r}")
             return X(value)
 
-    converter = COMMON_CONVERTER.with_(XConverter())
+    loader = COMMON_CONVERTER.with_(XLoader())
 
     x = [X(1)]
 
-    x_de = from_json(list[X], [1], converter=converter)
+    x_de = from_json(list[X], [1], loader=loader)
 
     assert x == x_de
 
@@ -202,6 +202,6 @@ def test_union_of_classes():
     @dataclass
     class B: bb: int
 
-    b = convert_from_json_unstrict(A | B, {'bb': 1})
+    b = from_json(A | B, {'bb': 1}, allow_extra_keys=True)
 
     assert isinstance(b, B)

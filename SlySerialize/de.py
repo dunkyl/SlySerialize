@@ -1,37 +1,37 @@
 '''
 Extended support for deserialization of Python types from JSON
 '''
-from .converter import Loader, LoaderCollection, DesCtx
+from .converter import Converter, Loader, ConverterCollection, DesCtx
 from .converters import *
 from .asynch import recursive_await
 
-_basic = (
+_common = (
     JsonScalarConverter(),
-    ListOrSetLoader(),
+    ListOrSetConverter(),
+    TupleConverter(),
+    DictConverter(),
+    ToFromJsonConverter(),
+    EnumConverter(),
+    DatetimeConverter(),
+)
+
+_special_loaders: list[Loader[JsonType]] = [
+    TypeVarLoader(),
+    UnionLoader(),
+    DelayedAnnotationLoader(),
     CollectionsAbcLoader(),
-    TupleLoader(),
-    DictLoader(),
-    FromJsonLoader(),
+]
+
+COMMON_CONVERTER = ConverterCollection(
+    *_common,
+    DataclassConverter(False),
+    loaders=[*_special_loaders]
 )
 
-COMMON_CONVERTER = LoaderCollection(
-    *_basic,
-    DataclassLoader(False),
-    EnumLoader(),
-    DatetimeLoader(),
-    TypeVarLoader(),
-    UnionLoader(),
-    DelayedAnnotationLoader(),
-)
-
-COMMON_CONVERTER_UNSTRICT = LoaderCollection(
-    *_basic,
-    DataclassLoader(True),
-    EnumLoader(),
-    DatetimeLoader(),
-    TypeVarLoader(),
-    UnionLoader(),
-    DelayedAnnotationLoader(),
+COMMON_CONVERTER_UNSTRICT = ConverterCollection(
+    *_common,
+    DataclassConverter(True),
+    loaders=[*_special_loaders]
 )
 
 def from_json(cls: type[T], value: JsonType, \
@@ -50,7 +50,7 @@ def from_json(cls: type[T], value: JsonType, \
     return context.des(value, cls)
 
 async def from_json_async(cls: type[T], value: JsonType,
-                            loader: Loader[JsonType]) -> T:
+                            loader: Converter[JsonType]) -> T:
     '''Converts a value from JSON to a type T with support for async converters.'''
 
     return await recursive_await(DesCtx[JsonType](loader).des(value, cls))
