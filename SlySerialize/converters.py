@@ -40,10 +40,10 @@ class FromJsonConverter(Converter[JsonType]):
     
 class DataclassConverter(Converter[JsonType]):
     '''Converts dataclasses'''
-    allow_extra_keys: bool
+    allow_extra: bool
 
     def __init__(self, allow_extra_keys: bool) -> None:
-        self.allow_extra_keys = allow_extra_keys
+        self.allow_extra = allow_extra_keys
 
     def can_convert(self, cls: type) -> bool:
         return is_dataclass(get_origin(cls) or cls)
@@ -54,21 +54,25 @@ class DataclassConverter(Converter[JsonType]):
         dataclass = get_origin(cls) or cls
         inner_ctx = copy.copy(ctx)
         if origin := get_origin(cls):
-            targs = get_args(cls)
+            ts = get_args(cls)
             params: tuple[TypeVar, ...] = getattr(origin, '__parameters__')
             defined_type_params = {
                 str(var): t # like ~T: int
-                for var, t in zip(params, targs)
+                for var, t in zip(params, ts)
             }
             inner_ctx.type_vars = ctx.type_vars | defined_type_params
         inner_ctx.parent_type = dataclass
 
         fields_ = fields(dataclass)
 
-        if not self.allow_extra_keys:
-            for key in value.keys():
-                if key not in {f.name for f in fields_}:
-                    raise TypeError(F"Unknown field {key} in {value}")
+        required = set(f.name for f in fields_)
+        given = set(value.keys())
+
+        if not self.allow_extra and (extra := given - required):
+            raise TypeError(F"Unexpected fields {extra}")
+        
+        if missing := required - given:
+            raise TypeError(F"Missing fields {missing}")
         
         return dataclass(**{
             f.name: inner_ctx.des(value[f.name], f.type)

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Generic, TypeVar
 from SlySerialize.converter import Converter, DesCtx
 from SlySerialize.jsontype import JsonType
-from SlySerialize.de import convert_from_json, COMMON_CONVERTER
+from SlySerialize.de import convert_from_json, COMMON_CONVERTER, convert_from_json_unstrict
 
 def test_de_simple():
     for x in (None, 1, 2.5, "hi", True):
@@ -191,3 +191,17 @@ def test_custom_converter():
     x_de = convert_from_json(list[X], [1], converter=converter)
 
     assert x == x_de
+
+def test_union_of_classes():
+
+    @dataclass
+    class A:
+        aa: int
+        bb: int
+
+    @dataclass
+    class B: bb: int
+
+    b = convert_from_json_unstrict(A | B, {'bb': 1})
+
+    assert isinstance(b, B)
