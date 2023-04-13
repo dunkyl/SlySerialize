@@ -41,7 +41,9 @@ def convert_from_json(cls: type[T], value: JsonType, \
     If not specified, uses the default converter.'''
     if converter is None:
         converter = COMMON_CONVERTER
-    return DesCtx[JsonType](converter).des(value, cls)
+    context = DesCtx[JsonType](converter)
+    context.parent_type = cls
+    return context.des(value, cls)
 
 def convert_from_json_unstrict(cls: type[T], value: JsonType, ) -> T:
     '''Converts a value from JSON to a type T.

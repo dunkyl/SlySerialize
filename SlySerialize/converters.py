@@ -1,3 +1,4 @@
+'''Converter implementations for common types'''
 import copy
 import sys
 from datetime import datetime
@@ -7,6 +8,7 @@ from types import NoneType, UnionType
 from typing import TypeVar, Any, get_origin, get_args
 from dataclasses import is_dataclass, fields
 from collections.abc import Mapping, Sequence
+import typing
 
 from .typevars import T, Domain
 from .jsontype import JsonType
@@ -166,7 +168,7 @@ class TypeVarConverter(Converter[Domain]):
 class UnionConverter(Converter[Domain]):
     '''Converts unions'''
     def can_convert(self, cls: type):
-        return type(cls) is UnionType
+        return type(cls) is UnionType or get_origin(cls) is typing.Union
     
     def des(self, ctx: DesCtx[Domain], value: Domain, cls: type[T]) -> T:
         possible_types = get_args(cls)
@@ -209,10 +211,14 @@ class DelayedAnnotationConverter(Converter[Domain]):
         return type(cls) is str
     
     def des(self, ctx: DesCtx[Domain], value: Domain, cls: type[T]) -> T:
+        print(F"Parent type: {ctx.parent_type}")
         if ctx.parent_type is not None:
-            cls_globals = vars(sys.modules[ctx.parent_type.__module__])
+            
+            cls_globals = vars(sys.modules[ctx.parent_type.__module__]) \
+                | { ctx.parent_type.__name__: ctx.parent_type }
         else:
             cls_globals = {}
+        
         t = eval(cls, cls_globals) # type: ignore - cls is str
         return ctx.des(value, t)
     
