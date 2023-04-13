@@ -6,36 +6,37 @@ import inspect
 from types import NoneType, UnionType
 from typing import TypeVar, Any, get_origin, get_args
 from dataclasses import is_dataclass, fields
+from collections.abc import Mapping, Sequence
 
 from .typevars import T, Domain
-from .jsontype import JsonTypeCo, JsonType
+from .jsontype import JsonType
 from .converter import Converter, DesCtx
 
 def mismatch(cls: type, expected: Any):
     return TypeError(
         F"Mismatch: expected type {cls} to be respresnted as {expected}")
 
-class JsonScalarConverter(Converter[JsonTypeCo]):
+class JsonScalarConverter(Converter[JsonType]):
     '''Converts common scalar types'''
     def can_convert(self, cls: type) -> bool:
         return cls in (int, float, str, bool, NoneType)
 
-    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+    def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[T]) -> T:
         if isinstance(value, cls):
             return value
         raise mismatch(cls, type(value))
     
-class FromJsonConverter(Converter[JsonTypeCo]):
+class FromJsonConverter(Converter[JsonType]):
     '''Converts classes that have a `from_json` method'''
 
     def can_convert(self, cls: type) -> bool:
         return hasattr(cls, 'from_json')
     
-    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+    def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[T]) -> T:
         result = getattr(cls, 'from_json')(value)
         return result
     
-class DataclassConverter(Converter[JsonTypeCo]):
+class DataclassConverter(Converter[JsonType]):
     '''Converts dataclasses'''
     allow_extra_keys: bool
 
@@ -45,7 +46,7 @@ class DataclassConverter(Converter[JsonTypeCo]):
     def can_convert(self, cls: type) -> bool:
         return is_dataclass(get_origin(cls) or cls)
 
-    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+    def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, dict):
             raise mismatch(type(value), dict)
         dataclass = get_origin(cls) or cls
@@ -72,13 +73,13 @@ class DataclassConverter(Converter[JsonTypeCo]):
             for f in fields(dataclass)
         })
     
-class DictConverter(Converter[JsonTypeCo]):
+class DictConverter(Converter[JsonType]):
     '''Converts dicts'''
 
     def can_convert(self, cls: type):
         return (get_origin(cls) or cls) is dict
     
-    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+    def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, dict):
             raise mismatch(type(value), dict)
         
@@ -92,12 +93,12 @@ class DictConverter(Converter[JsonTypeCo]):
             for k, v in value.items()
         }) # type: ignore - T is dict[str, vt]
 
-class ListOrSetConverter(Converter[JsonTypeCo]):
+class ListOrSetConverter(Converter[JsonType]):
     '''Converts lists and sets'''
     def can_convert(self, cls: type):
         return (get_origin(cls) or cls) in (list, set)
     
-    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+    def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, list):
             raise mismatch(type(value), list)
         
@@ -107,12 +108,36 @@ class ListOrSetConverter(Converter[JsonTypeCo]):
             ctx.des(v, t) for v in value
         )
     
-class TupleConverter(Converter[JsonTypeCo]):
+class CollectionsAbcConverter(Converter[JsonType]):
+
+    def can_convert(self, cls: type):
+        return (get_origin(cls) or cls) in (Sequence, Mapping)
+    
+    def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[T]) -> T:
+        concrete = get_origin(cls) or cls
+        if concrete is Sequence:
+            if not isinstance(value, list):
+                raise mismatch(type(value), list)
+            
+            t, = get_args(cls) or (JsonType,)
+            return [
+                ctx.des(v, t) for v in value
+            ] # type: ignore - T is Seq[vt], list implements Seq
+        else: # Mapping
+            if not isinstance(value, dict):
+                raise mismatch(type(value), dict)
+            _, val_t = get_args(cls) or (str, JsonType)
+            return {
+                k: ctx.des(v, val_t)
+                for k, v in value.items()
+            } # type: ignore - T is Map[str, vt], dict implements Map
+    
+class TupleConverter(Converter[JsonType]):
     '''Converts tuples'''
     def can_convert(self, cls: type):
         return (get_origin(cls) or cls) is tuple
     
-    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+    def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, list):
             raise mismatch(type(value), list)
         
@@ -155,12 +180,12 @@ class UnionConverter(Converter[Domain]):
                 attempt_errors.append(e)
         raise TypeError(F"Failed to convert from {type(value)} to any of {possible_types}:\n" + "\n  ".join(str(e) for e in attempt_errors))
     
-class DatetimeConverter(Converter[JsonTypeCo]):
+class DatetimeConverter(Converter[JsonType]):
     '''Converts datetimes'''
     def can_convert(self, cls: type):
         return cls is datetime
     
-    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[datetime]) -> datetime:
+    def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[datetime]) -> datetime:
         if isinstance(value, str):
             return datetime.fromisoformat(value)
         elif isinstance(value, (int, float)):
@@ -168,12 +193,12 @@ class DatetimeConverter(Converter[JsonTypeCo]):
         else:
             raise mismatch(type(value), str|int|float)
 
-class EnumConverter(Converter[JsonTypeCo]):
+class EnumConverter(Converter[JsonType]):
     '''Converts string or integer enums'''
     def can_convert(self, cls: type):
         return inspect.isclass(cls) and issubclass(cls, Enum)
     
-    def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[T]) -> T:
+    def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, (str, int)):
             raise mismatch(type(value), str|int)
         return cls(value)

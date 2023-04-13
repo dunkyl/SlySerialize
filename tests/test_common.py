@@ -3,8 +3,8 @@ from enum import Enum
 from datetime import datetime
 from typing import Generic, TypeVar
 from SlySerialize.converter import Converter, DesCtx
-from SlySerialize.jsontype import JsonType, JsonTypeCo
-from SlySerialize.de import convert_from_json, common_converter_strict
+from SlySerialize.jsontype import JsonType
+from SlySerialize.de import convert_from_json, COMMON_CONVERTER
 
 def test_de_simple():
     for x in (None, 1, 2.5, "hi", True):
@@ -175,16 +175,16 @@ def test_custom_converter():
         def __eq__(self, other: object):
             return isinstance(other, X) and self.xx == other.xx
 
-    class XConverter(Converter[JsonTypeCo]):
+    class XConverter(Converter[JsonType]):
 
         def can_convert(self, cls: type): return cls is X
 
-        def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[X]) -> X:
+        def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[X]) -> X:
             if not isinstance(value, int):
                 raise ValueError(f"expected int, got {value!r}")
             return X(value)
 
-    converter = common_converter_strict.with_(XConverter())
+    converter = COMMON_CONVERTER.with_(XConverter())
 
     x = [X(1)]
 

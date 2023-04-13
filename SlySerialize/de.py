@@ -8,12 +8,13 @@ from .asynch import recursive_await
 _basic = (
     JsonScalarConverter(),
     ListOrSetConverter(),
+    CollectionsAbcConverter(),
     TupleConverter(),
     DictConverter(),
     FromJsonConverter(),
 )
 
-common_converter_strict = Converters(
+COMMON_CONVERTER = Converters(
     *_basic,
     DataclassConverter(False),
     EnumConverter(),
@@ -23,7 +24,7 @@ common_converter_strict = Converters(
     DelayedAnnotationConverter(),
 )
 
-common_converter_unstrict = Converters(
+COMMON_CONVERTER_UNSTRICT = Converters(
     *_basic,
     DataclassConverter(True),
     EnumConverter(),
@@ -33,20 +34,26 @@ common_converter_unstrict = Converters(
     DelayedAnnotationConverter(),
 )
 
-def convert_from_json(cls: type[T], value: JsonTypeCo, \
-                      converter: Converter[JsonTypeCo] | None = None) -> T:
+def convert_from_json(cls: type[T], value: JsonType, \
+                      converter: Converter[JsonType] | None = None) -> T:
     '''Converts a value from JSON to a type T.
 
     If not specified, uses the default converter.'''
     if converter is None:
-        converter = common_converter_strict
-    return DesCtx[JsonTypeCo](converter).des(value, cls)
+        converter = COMMON_CONVERTER
+    return DesCtx[JsonType](converter).des(value, cls)
 
-async def convert_from_json_async(cls: type[T], value: JsonTypeCo, \
-                            converter: Converter[JsonTypeCo] | None = None) -> T:
+def convert_from_json_unstrict(cls: type[T], value: JsonType, ) -> T:
+    '''Converts a value from JSON to a type T.
+
+    Uses the default converter and allows unused fields for dataclasses.'''
+    return convert_from_json(cls, value, COMMON_CONVERTER_UNSTRICT)
+
+async def convert_from_json_async(cls: type[T], value: JsonType, \
+                            converter: Converter[JsonType] | None = None) -> T:
     '''Converts a value from JSON to a type T with support for async converters.
 
     If not specified, uses the default converter.'''
     if converter is None:
-        converter = common_converter_strict
-    return await recursive_await(DesCtx[JsonTypeCo](converter).des(value, cls))
+        converter = COMMON_CONVERTER
+    return await recursive_await(DesCtx[JsonType](converter).des(value, cls))

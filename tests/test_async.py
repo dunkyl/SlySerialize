@@ -6,7 +6,7 @@ from SlySerialize.de import convert_from_json
 
 from SlySerialize.asynch import recursive_await, AsyncConverter
 
-from SlySerialize.jsontype import JsonTypeCo
+from SlySerialize.jsontype import JsonType
 
 class RequiresAsync:
     value: int
@@ -15,7 +15,7 @@ class RequiresAsync:
         self.value = value
 
     @classmethod
-    async def from_json(cls, value: JsonTypeCo):
+    async def from_json(cls, value: JsonType):
         if not isinstance(value, int):
             raise TypeError("Expected int")
         await asyncio.sleep(0.1)
@@ -64,12 +64,12 @@ class MyAsync2:
                self.thing == other.thing and \
                 self.next == other.next
 
-class MyClass2Converter(AsyncConverter[JsonTypeCo]):
+class MyClass2Converter(AsyncConverter[JsonType]):
 
     def can_convert(self, cls: type):
         return cls is MyAsync2
     
-    async def des(self, ctx: DesCtx[JsonTypeCo], value: JsonTypeCo, cls: type[MyAsync2]) -> MyAsync2:
+    async def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[MyAsync2]) -> MyAsync2:
         if not isinstance(value, list):
             raise TypeError("Expected list")
         await asyncio.sleep(0.1)
