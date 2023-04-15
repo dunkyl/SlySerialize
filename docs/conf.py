@@ -35,11 +35,11 @@ autodoc_default_options = {
 }
 
 autodoc_member_order = 'bysource'
-# autodoc_typehints = "description"
+autodoc_typehints = "description"
 autodoc_type_aliases = {
-    'JsonTypeCo': 'JsonTypeCo'
+    'JsonType': 'SlySerialize._type_vars.JsonType'
 }
-autodoc_typehints_format = 'short' 
+# autodoc_typehints_format = 'short' 
 python_use_unqualified_type_names = True
 
 
@@ -55,6 +55,12 @@ class MockedClassDocumenter(autodoc.ClassDocumenter):
     def add_line(self, line: str, source: str, *lineno: int) -> None:
         if line == "   Bases: :py:class:`object`":
             return
+        if "JsonType" in line:
+            print(line)
+        line = line.replace(
+            r":py:class:`int` | :py:class:`float` | :py:class:`bool` | :py:class:`str` | :py:obj:`None` | :py:class:`~collections.abc.Sequence`\ [JsonType] | :py:class:`~collections.abc.Mapping`\ [:py:class:`str`, JsonType]",
+            ":py:class:`JsonType`"
+        )
         super().add_line(line, source, *lineno)
 
 autodoc.ClassDocumenter = MockedClassDocumenter
