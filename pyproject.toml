@@ -3,7 +3,7 @@ name = "SlySerialize"
 version = "0.0.1"
 description = "Convert JSON-like data structures into nice Python objects."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = { file="LICENSE" }
 authors = [{name="Dunkyl 🔣🔣"}]
 dependencies = []

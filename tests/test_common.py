@@ -155,7 +155,7 @@ def test_de_derived():
         },
         'account': {
             'username': 'dunkyl', 'locked': False, 
-            'created_at': '2022-11-05T00:00:00.000Z', 'emojis': [], 'fields': []
+            'created_at': '2022-11-05T00:00:00.000', 'emojis': [], 'fields': []
         }, 
         'media_attachments': [], 'mentions': [], 'tags': [], 'emojis': [], 
         'card': None, 'poll': None,

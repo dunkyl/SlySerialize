@@ -1,4 +1,4 @@
-# Sly Serialize for Python
+# ![sly logo](https://raw.githubusercontent.com/dunkyl/SlyMeta/main/sly%20logo.svg) Sly Serialize for Python
 
 Convert JSON-like data structures into nice Python objects.
 
@@ -16,6 +16,12 @@ Key features:
 In just one line:
 ```py
 assert myThing == from_json(MyClass[int], to_json(myThing))
+```
+
+## Install
+
+```shell
+pip install slyserialize
 ```
 
 ## Basic usage
