@@ -53,7 +53,7 @@ serialized = {
     "builtin": [3.1, ["a"]],
 }
 
-assert my_obj == convert_from_json(MyClass[int], serialized)
+assert my_obj == from_json(MyClass[int], serialized)
 ```
 
 ## Should I use this?
