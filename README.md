@@ -26,12 +26,12 @@ pip install slyserialize
 
 ## Basic usage
 
-Call `convert_from_json` with a target type, with generic arguments, and some json data, such as returned from `json.loads`. Generic arguments are optional, but if you don't provide them, you'll get a `TypeError` if the target type requires them to be concrete. See the final line in the following example:
+Call `from_json` with a target type, with generic arguments, and some json data, such as returned from `json.loads`. Generic arguments are optional, but if you don't provide them, you'll get a `TypeError` if the target type requires them to be concrete. See the final line in the following example:
 
 ```py
 from typing import Generic, TypeVar, TypeAlias
 from dataclasses import dataclass
-from SlySerialize import convert_from_json
+from SlySerialize import from_json
 
 ListOfIntegers: TypeAlias = list[int]
 T = TypeVar("T")
