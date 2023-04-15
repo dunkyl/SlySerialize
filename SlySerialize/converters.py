@@ -12,7 +12,7 @@ import typing
 from asyncio import locks
 import functools
 
-from ._type_vars import T, U, Domain, JsonType
+from ._type_vars import T, U, Domain, JsonType, JsonScalar
 from .abc import Converter, Unloader, DesCtx, SerCtx, Loader
 
 JsonDCtx = DesCtx[JsonType]
@@ -26,17 +26,17 @@ def _expect_type(value: Any, cls: type[U]|tuple[type[U], ...]) -> U:
         raise _mismatch(type(value), cls)
     return value
 
-class JsonScalarConverter(Converter[JsonType]):
+class JsonScalarConverter(Converter[JsonScalar]):
     '''Converts common scalar types'''
     def can_load(self, cls: type) -> bool:
         return cls in (int, float, str, bool, NoneType)
     
     def can_unload(self, cls: type) -> bool: return self.can_load(cls)
 
-    def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
+    def des(self, ctx: DesCtx[JsonScalar], value: JsonScalar, cls: type[JsonScalar]) -> JsonScalar:
         return _expect_type(value, cls)
     
-    def ser(self, ctx: SerCtx[JsonType], value: Any) -> JsonType: return value
+    def ser(self, ctx: SerCtx[JsonScalar], value: Any) -> JsonScalar: return value
     
 class FromJsonLoader(Converter[JsonType]):
     '''Converts classes that have a `from_json` method'''

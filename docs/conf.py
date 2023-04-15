@@ -35,9 +35,9 @@ autodoc_default_options = {
 }
 
 autodoc_member_order = 'bysource'
-autodoc_typehints = "description"
+# autodoc_typehints = "description"
 autodoc_type_aliases = {
-    'JsonType': 'SlySerialize._type_vars.JsonType'
+    "JsonScalar": "JsonScalar"
 }
 # autodoc_typehints_format = 'short' 
 python_use_unqualified_type_names = True
@@ -51,16 +51,39 @@ html_title = "SlyMastodon for Python"
 
 from sphinx.ext import autodoc
 
+def json_scalar_(s: str) -> str:
+    return s.replace(
+        "int | float | bool | str | None",
+        "JsonScalar"
+    )
+
+def json_type_(s: str) -> str:
+    return s.replace(
+        "JsonScalar | ~collections.abc.Sequence[JsonScalar | ~collections.abc.Sequence[JsonType] | ~collections.abc.Mapping[str, JsonType]] | ~collections.abc.Mapping[str, JsonScalar | ~collections.abc.Sequence[JsonType] | ~collections.abc.Mapping[str, JsonType]]",
+        "JsonType"
+    )
+
+def ref_json_type_(s: str) -> str:
+    return s.replace(
+        r":py:class:`int` | :py:class:`float` | :py:class:`bool` | :py:class:`str` | :py:obj:`None` | :py:class:`~collections.abc.Sequence`\ [JsonType] | :py:class:`~collections.abc.Mapping`\ [:py:class:`str`, JsonType]",
+        ":py:class:`JsonType`"
+    )
+
 class MockedClassDocumenter(autodoc.ClassDocumenter):
     def add_line(self, line: str, source: str, *lineno: int) -> None:
         if line == "   Bases: :py:class:`object`":
             return
-        if "JsonType" in line:
-            print(line)
-        line = line.replace(
-            r":py:class:`int` | :py:class:`float` | :py:class:`bool` | :py:class:`str` | :py:obj:`None` | :py:class:`~collections.abc.Sequence`\ [JsonType] | :py:class:`~collections.abc.Mapping`\ [:py:class:`str`, JsonType]",
-            ":py:class:`JsonType`"
-        )
+        line = ref_json_type_(line)
         super().add_line(line, source, *lineno)
 
+class MockedMethodDocumenter(autodoc.MethodDocumenter):
+    def format_signature(self, **kwargs) -> str:
+        return json_type_(json_scalar_(super().format_signature(**kwargs)))
+    
+class MockedFnDocumenter(autodoc.FunctionDocumenter):
+    def format_signature(self, **kwargs) -> str:
+        return json_type_(json_scalar_(super().format_signature(**kwargs)))
+
 autodoc.ClassDocumenter = MockedClassDocumenter
+autodoc.MethodDocumenter = MockedMethodDocumenter
+autodoc.FunctionDocumenter = MockedFnDocumenter
