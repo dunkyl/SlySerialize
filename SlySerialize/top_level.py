@@ -1,7 +1,5 @@
-'''
-Extended support for deserialization of Python types from JSON
-'''
-from ._converter import Converter, Loader, DesCtx
+'Functions and converters for using SlySerialize.'
+from .abc import Converter, Loader, DesCtx
 from .converters import *
 import asyncio
 

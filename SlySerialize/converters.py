@@ -1,4 +1,4 @@
-'''Loader implementations for common types'''
+'''Converter and Loader implementations for common types'''
 import copy
 import sys
 from datetime import datetime
@@ -13,17 +13,17 @@ from asyncio import locks
 import functools
 
 from ._type_vars import T, U, Domain, JsonType
-from ._converter import Converter, Unloader, DesCtx, SerCtx, Loader
+from .abc import Converter, Unloader, DesCtx, SerCtx, Loader
 
 JsonDCtx = DesCtx[JsonType]
 
-def mismatch(actual: type, expected: Any):
+def _mismatch(actual: type, expected: Any):
     return TypeError(
         F"Mismatch: expected type {actual} to be represented as {expected}")
 
-def expect_type(value: Any, cls: type[U]|tuple[type[U], ...]) -> U:
+def _expect_type(value: Any, cls: type[U]|tuple[type[U], ...]) -> U:
     if not isinstance(value, cls):
-        raise mismatch(type(value), cls)
+        raise _mismatch(type(value), cls)
     return value
 
 class JsonScalarConverter(Converter[JsonType]):
@@ -34,7 +34,7 @@ class JsonScalarConverter(Converter[JsonType]):
     def can_unload(self, cls: type) -> bool: return self.can_load(cls)
 
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
-        return expect_type(value, cls)
+        return _expect_type(value, cls)
     
     def ser(self, ctx: SerCtx[JsonType], value: Any) -> JsonType: return value
     
@@ -74,7 +74,7 @@ class DataclassConverter(Converter[JsonType]):
 
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, dict):
-            raise mismatch(type(value), dict)
+            raise _mismatch(type(value), dict)
         dataclass = get_origin(cls) or cls
         inner_ctx = copy.copy(ctx)
         if origin := get_origin(cls):
@@ -119,7 +119,7 @@ class DictConverter(Converter[JsonType]):
     
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, dict):
-            raise mismatch(type(value), dict)
+            raise _mismatch(type(value), dict)
         
         _, val_t = get_args(cls) or (str, JsonType)
         
@@ -142,7 +142,7 @@ class ListOrSetConverter(Converter[JsonType]):
     
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[ListOrSet]) -> ListOrSet:
         if not isinstance(value, list):
-            raise mismatch(type(value), list)
+            raise _mismatch(type(value), list)
         
         concrete = get_origin(cls) or cls
         t, = get_args(cls) or (JsonType,)
@@ -162,7 +162,7 @@ class CollectionsAbcLoader(Loader[JsonType]):
         concrete = get_origin(cls) or cls
         if concrete is Sequence:
             if not isinstance(value, list):
-                raise mismatch(type(value), list)
+                raise _mismatch(type(value), list)
             
             t, = get_args(cls) or (JsonType,)
             return [
@@ -170,7 +170,7 @@ class CollectionsAbcLoader(Loader[JsonType]):
             ] # type: ignore - T is Seq[vt], list implements Seq
         else: # Mapping
             if not isinstance(value, dict):
-                raise mismatch(type(value), dict)
+                raise _mismatch(type(value), dict)
             _, val_t = get_args(cls) or (str, JsonType)
             return {
                 k: ctx.des(v, val_t)
@@ -186,7 +186,7 @@ class TupleConverter(Converter[JsonType]):
     
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, list):
-            raise mismatch(type(value), list)
+            raise _mismatch(type(value), list)
         
         ts = get_args(cls) or tuple(JsonType for _ in value)
 
@@ -243,7 +243,7 @@ class DatetimeConverter(Converter[JsonType]):
         elif isinstance(value, (int, float)):
             return datetime.fromtimestamp(value)
         else:
-            raise mismatch(type(value), str|int|float)
+            raise _mismatch(type(value), str|int|float)
         
     def ser(self, ctx: SerCtx[JsonType], value: datetime) -> JsonType:
         return value.isoformat()
@@ -257,7 +257,7 @@ class EnumConverter(Converter[JsonType]):
     
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[T]) -> T:
         if not isinstance(value, (str, int)):
-            raise mismatch(type(value), str|int)
+            raise _mismatch(type(value), str|int)
         return cls(value)
     
     def ser(self, ctx: SerCtx[JsonType], value: Enum) -> JsonType:

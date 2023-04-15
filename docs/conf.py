@@ -32,7 +32,6 @@ autodoc_default_options = {
     "show-inheritance": False,
     "undoc-members": True,
     "member-order": "bysource",
-    "special-members": "__await__",
 }
 
 autodoc_member_order = 'bysource'
