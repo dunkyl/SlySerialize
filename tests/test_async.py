@@ -4,7 +4,7 @@ from SlySerialize.converter import LoaderCollection, DesCtx
 from SlySerialize.converters import DataclassConverter, JsonScalarConverter, ListOrSetConverter
 from SlySerialize.de import from_json_async
 
-from SlySerialize.asynch import recursive_await, AsyncLoader
+from SlySerialize.asynch import AsyncLoader
 
 from SlySerialize.jsontype import JsonType
 
