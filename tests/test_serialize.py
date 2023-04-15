@@ -1,6 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass, asdict
-from SlySerialize.de import to_json
+from SlySerialize._top_level import to_json
 from SlySerialize import JsonType
 
 

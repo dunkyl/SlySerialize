@@ -2,9 +2,7 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from datetime import datetime
 from typing import Generic, TypeVar
-from SlySerialize.converter import Loader, DesCtx
-from SlySerialize.jsontype import JsonType
-from SlySerialize.de import from_json, COMMON_CONVERTER
+from SlySerialize import Loader, DesCtx, JsonType, from_json, COMMON_CONVERTER
 
 def test_de_simple():
     for x in (None, 1, 2.5, "hi", True):

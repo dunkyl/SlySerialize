@@ -1,9 +1,9 @@
 '''
 Extended support for deserialization of Python types from JSON
 '''
-from .converter import Converter, Loader, ConverterCollection, DesCtx
+from ._converter import Converter, Loader, DesCtx
 from .converters import *
-from .asynch import recursive_await
+import asyncio
 
 _common = (
     JsonScalarConverter(),
@@ -58,7 +58,7 @@ async def from_json_async(cls: type[T], value: JsonType,
             loader = COMMON_CONVERTER_UNSTRICT
         else:
             loader = COMMON_CONVERTER
-    return await recursive_await(DesCtx[JsonType](loader, only_sync=False).des(value, cls))
+    return await _recursive_await(DesCtx[JsonType](loader, only_sync=False).des(value, cls))
 
 def to_json(value: Any, converter: Converter[JsonType]|None=None) -> JsonType:
     '''Converts a value to JSON.'''
@@ -66,3 +66,26 @@ def to_json(value: Any, converter: Converter[JsonType]|None=None) -> JsonType:
         converter = COMMON_CONVERTER
     context = SerCtx[JsonType](converter)
     return context.ser(value)
+
+
+async def _recursive_await(value: asyncio.Future[Any] \
+            | list[Any] | dict[str, Any] | set[Any] \
+            | tuple[Any, ...] | Any
+        ) -> Any:
+    '''Await a value, or all values in it'''
+    if asyncio.isfuture(value) or asyncio.iscoroutine(value):
+        return await value
+    if isinstance(value, list):
+        return [await _recursive_await(v) for v in value]
+    elif isinstance(value, dict):
+        return {k: await _recursive_await(v) for k, v in value.items()}
+    elif isinstance(value, set):
+        return {await _recursive_await(v) for v in value}
+    elif isinstance(value, tuple):
+        vals = [(await _recursive_await(v)) for v in value]
+        return tuple(*vals)
+    elif is_dataclass(value):
+        return type(value)(**{f.name: await _recursive_await(getattr(value, f.name)) for f in fields(value)})
+    else:
+        print(F"Not awaiting {value}, {type(value)}")
+        return value
