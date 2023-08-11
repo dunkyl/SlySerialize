@@ -46,7 +46,7 @@ python_use_unqualified_type_names = True
 # -- Options for HTML output -------------------------------------------------
 html_theme = 'furo'
 html_static_path = ['_static']
-html_title = "SlyMastodon for Python"
+html_title = "SlySerialize for Python"
 
 
 from sphinx.ext import autodoc
