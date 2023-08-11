@@ -71,7 +71,7 @@ async def _recursive_await(value: asyncio.Future[Any] \
             | tuple[Any, ...] | Any
         ) -> Any:
     '''Await a value, or all values in it'''
-    if asyncio.isfuture(value) or asyncio.iscoroutine(value):
+    if inspect.isawaitable(value):
         return await value
     if isinstance(value, list):
         return [await _recursive_await(v) for v in value]
@@ -85,5 +85,4 @@ async def _recursive_await(value: asyncio.Future[Any] \
     elif is_dataclass(value):
         return type(value)(**{f.name: await _recursive_await(getattr(value, f.name)) for f in fields(value)})
     else:
-        print(F"Not awaiting {value}, {type(value)}")
         return value
