@@ -15,7 +15,7 @@ import functools
 from ._type_vars import *
 from .abc import *
 
-JsonDCtx = DesCtx[JsonType,]
+JsonDCtx = DesCtx[JsonType]
 JsonSCtx = SerCtx[JsonType]
 
 def _origin(cls: T) -> T: return get_origin(cls) or cls
@@ -29,7 +29,7 @@ def _expect_type(value: Any, cls: type[T]|tuple[type[T], ...]) -> T:
         raise _mismatch(type(value), cls)
     return value
 
-class JsonScalarConverter(Converter[JsonScalar, JsonType]):
+class JsonScalarConverter(Converter[JsonType, JsonScalar]):
     '''Converts common scalar types'''
     def can_load(self, cls: type) -> bool:
         return cls in (int, float, str, bool, NoneType)
@@ -41,7 +41,7 @@ class JsonScalarConverter(Converter[JsonScalar, JsonType]):
     
     def ser(self, ctx: JsonSCtx, value: JsonScalar) -> JsonType: return value
     
-class FromJsonLoader(Converter[JsonType, Any]):
+class FromJsonLoader(Converter[Any, JsonType]):
     '''Converts classes that have a `from_json` method'''
 
     def can_load(self, cls: type) -> bool:
@@ -50,7 +50,7 @@ class FromJsonLoader(Converter[JsonType, Any]):
     def des(self, ctx: JsonDCtx, value: JsonType, cls: type[Any]) -> Any:
         return getattr(cls, 'from_json')(value)
     
-class ToJsonUnloader(Unloader[Any, JsonType]):
+class ToJsonUnloader(Unloader[JsonType, Any]):
     '''Converts classes that have a `to_json` method'''
 
     def can_unload(self, cls: type) -> bool:
@@ -112,7 +112,7 @@ class DataclassConverter(Converter[JsonType, Any]):
             for f in fields(value)
         }
     
-class DictConverter(Converter[dict[str, T], JsonType]):
+class DictConverter(Converter[JsonType, dict[str, T]]):
     '''Converts dicts with string keys'''
 
     def can_load(self, cls: type):
@@ -134,7 +134,7 @@ class DictConverter(Converter[dict[str, T], JsonType]):
     def ser(self, ctx: JsonSCtx, value: dict[str, T]) -> JsonType:
         return { k: ctx.ser(v) for k, v in value.items() }
 
-class ListOrSetConverter(Converter[list[T] | set[T], JsonType]):
+class ListOrSetConverter(Converter[JsonType, list[T] | set[T]]):
     '''Converts lists and sets'''
     
     def can_load(self, cls: type):
@@ -179,7 +179,7 @@ class CollectionsAbcLoader(Loader[JsonType, Sequence[T] | Mapping[str, T]]):
                 for k, v in value.items()
             } # type: ignore - T is Map[str, vt], dict implements Map
     
-class TupleConverter(Converter[tuple[Any, ...], JsonType]):
+class TupleConverter(Converter[JsonType, tuple[Any, ...]]):
     '''Converts tuples'''
     def can_load(self, cls: type):
         return _origin(cls) is tuple
@@ -232,7 +232,7 @@ class UnionLoader(Loader[Domain, T]):
                 attempt_errors.append(e)
         raise TypeError(F"Failed to convert from {type(value)} to any of {possible_types}:\n" + "\n  ".join(str(e) for e in attempt_errors))
     
-class DatetimeConverter(Converter[datetime, JsonType]):
+class DatetimeConverter(Converter[JsonType, datetime]):
     '''Converts datetimes'''
     def can_load(self, cls: type):
         return cls is datetime
@@ -251,7 +251,7 @@ class DatetimeConverter(Converter[datetime, JsonType]):
         return value.isoformat("T", 'milliseconds').replace('+00:00', 'Z')
 
 EnumType = TypeVar("EnumType", bound=Enum)
-class EnumConverter(Converter[EnumType, JsonType]):
+class EnumConverter(Converter[JsonType, EnumType]):
     '''Converts string or integer enums'''
     def can_load(self, cls: type):
         return inspect.isclass(cls) and issubclass(cls, Enum)
@@ -313,14 +313,14 @@ class LoaderCollection(Loader[Domain, Any]):
         return des.des(ctx, value, cls)
 
 
-class UnloaderCollection(Unloader[Any, Domain]):
+class UnloaderCollection(Unloader[Domain, Any]):
     '''Collection of many unloaders to handle many types at once'''
-    unloaders: list[Unloader[Any, Domain]]
+    unloaders: list[Unloader[Domain, Any]]
 
-    def __init__(self, *unloaders: Unloader[Any, Domain]):
+    def __init__(self, *unloaders: Unloader[Domain, Any]):
         self.unloaders = list(unloaders)
 
-    def with_(self, *unloaders: Unloader[Any, Domain]):
+    def with_(self, *unloaders: Unloader[Domain, Any]):
         new = copy.deepcopy(self)
         new.unloaders.extend(unloaders)
         return new
@@ -329,7 +329,7 @@ class UnloaderCollection(Unloader[Any, Domain]):
         return bool(self.find_unloader(cls))
     
     @functools.lru_cache(maxsize=128)
-    def find_unloader(self, cls: type) -> Unloader[Any, Domain] | None:
+    def find_unloader(self, cls: type) -> Unloader[Domain, Any] | None:
         for c in self.unloaders:
             if c.can_unload(cls):
                 return c
@@ -341,10 +341,10 @@ class UnloaderCollection(Unloader[Any, Domain]):
             raise TypeError(F"No unloader for {type(value)}")
         return ser.ser(ctx, value)
     
-class ConverterCollection(UnloaderCollection[Domain], LoaderCollection[Domain], Converter[Any, Domain]):
+class ConverterCollection(UnloaderCollection[Domain], LoaderCollection[Domain], Converter[Domain, Any]):
     '''Collection of many converters to handle many types at once'''
 
-    def __init__(self, *converters: Converter[Any, Domain], loaders: list[Loader[Domain, Any]]|None = None, unloaders: list[Unloader[Any, Domain]]|None = None):
+    def __init__(self, *converters: Converter[Domain, Any], loaders: list[Loader[Domain, Any]]|None = None, unloaders: list[Unloader[Domain, Any]]|None = None):
         self.unloaders = []
         self.loaders = []
         for c in converters:
@@ -355,7 +355,7 @@ class ConverterCollection(UnloaderCollection[Domain], LoaderCollection[Domain], 
         for u in unloaders or []:
             self.unloaders.append(u)
 
-    def with_(self, *converters: Unloader[Any, Domain]|Loader[Domain, Any]):
+    def with_(self, *converters: Unloader[Domain, Any]|Loader[Domain, Any]):
         new = copy.deepcopy(self)
         for c in converters:
             if isinstance(c, Unloader):
@@ -370,7 +370,7 @@ class PleaseWaitConverters(ConverterCollection[Domain]):
     initialization process.'''
     wait_flag: locks.Event
 
-    def __init__(self, *converters: Converter[Any, Domain]):
+    def __init__(self, *converters: Converter[Domain, Any]):
         super().__init__(*converters)
         self.wait_flag = locks.Event()
 

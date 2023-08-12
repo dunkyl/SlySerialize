@@ -29,20 +29,20 @@ class LoadingContext(Generic[Domain, T]):
     
 DesCtx: TypeAlias = LoadingContext[Domain, Any]
 
-class UnloadingContext(Generic[T, Domain]):
+class UnloadingContext(Generic[Domain, T]):
     'State for serialization and recursion'
 
-    parent_serializer: 'Unloader[T, Domain]'
+    parent_serializer: 'Unloader[Domain, T]'
 
-    def __init__(self, converter: 'Unloader[T, Domain]'):
+    def __init__(self, converter: 'Unloader[Domain, T]'):
         self.parent_serializer = converter
 
     def ser(self, value: T) -> Domain:
         return self.parent_serializer.ser(self, value)
     
-SerCtx: TypeAlias = UnloadingContext[Any, Domain]
+SerCtx: TypeAlias = UnloadingContext[Domain, Any]
 
-class Unloader(ABC, Generic[T, Domain]):
+class Unloader(ABC, Generic[Domain, T]):
     'Serializes one type or group of types'
 
     @abstractmethod
@@ -73,7 +73,7 @@ class Loader(ABC, Generic[Domain, T]):
         ...
 
 
-class Converter(Unloader[T, Domain], Loader[Domain, T]):
+class Converter(Unloader[Domain, T], Loader[Domain, T]):
     'Both serializes and deserializes one type or group of types T to and from Domain'
     pass
 

@@ -3,7 +3,7 @@ from .abc import Converter, Loader, DesCtx
 from .converters import *
 import asyncio
 
-_common: list[Converter[Any, JsonType]] = [
+_common: list[Converter[JsonType, Any]] = [
     JsonScalarConverter(),
     ListOrSetConverter(),
     TupleConverter(),
