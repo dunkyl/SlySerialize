@@ -6,15 +6,15 @@ from typing import Any, Generic, TypeAlias
 
 from ._type_vars import *
 
-class LoadingContext(Generic[Domain]):
+class LoadingContext(Generic[Domain, T]):
     'State for deserialization and recursion'
 
     type_vars: dict[str, type]
     parent_type: type | None
-    parent_deserializer: 'Loader[Domain]'
+    parent_deserializer: 'Loader[Domain, T]'
     only_sync: bool
 
-    def __init__(self, converter: 'Loader[Domain]', only_sync: bool):
+    def __init__(self, converter: 'Loader[Domain, T]', only_sync: bool):
         self.type_vars = {}
         self.parent_type = None
         self.only_sync = only_sync
@@ -27,22 +27,22 @@ class LoadingContext(Generic[Domain]):
                 raise ValueError("Async converter used in sync context")
         return result
     
-DesCtx: TypeAlias = LoadingContext[Domain]
+DesCtx: TypeAlias = LoadingContext[Domain, Any]
 
-class UnloadingContext(Generic[Domain]):
+class UnloadingContext(Generic[T, Domain]):
     'State for serialization and recursion'
 
-    parent_serializer: 'Unloader[Domain]'
+    parent_serializer: 'Unloader[T, Domain]'
 
-    def __init__(self, converter: 'Unloader[Domain]'):
+    def __init__(self, converter: 'Unloader[T, Domain]'):
         self.parent_serializer = converter
 
-    def ser(self, value: Any) -> Domain:
+    def ser(self, value: T) -> Domain:
         return self.parent_serializer.ser(self, value)
     
-SerCtx: TypeAlias = UnloadingContext[Domain]
+SerCtx: TypeAlias = UnloadingContext[Any, Domain]
 
-class Unloader(ABC, Generic[Domain]):
+class Unloader(ABC, Generic[T, Domain]):
     'Serializes one type or group of types'
 
     @abstractmethod
@@ -51,13 +51,13 @@ class Unloader(ABC, Generic[Domain]):
         ...
 
     @abstractmethod
-    def ser(self, ctx: SerCtx[Domain], value: Any) -> Domain:
+    def ser(self, ctx: SerCtx[Domain], value: T) -> Domain:
         '''Convert a value to a domain-compatible type.
         
         Called only if `can_unload` returned `True` for `type(value)`.'''
         ...
 
-class Loader(ABC, Generic[Domain]):
+class Loader(ABC, Generic[Domain, T]):
     'Deserializes one type or group of types'
 
     @abstractmethod
@@ -73,12 +73,14 @@ class Loader(ABC, Generic[Domain]):
         ...
 
 
-class Converter(Unloader[Domain], Loader[Domain]):
-    'Both serializes and deserializes one type or group of types'
+class Converter(Unloader[T, Domain], Loader[Domain, T]):
+    'Both serializes and deserializes one type or group of types T to and from Domain'
     pass
 
-class AsyncLoader(Loader[Domain]):
+class AsyncLoader(Loader[Domain, T]):
     '''Deserializes one type or group of types asynchronously'''
 
     @abstractmethod
-    async def des(self, ctx: DesCtx[Domain], value: Domain, cls: type[T]) -> T: pass
+    async def des(self, # type: ignore
+                  ctx: DesCtx[Domain], value: Domain, cls: type) -> T: ... 
+        

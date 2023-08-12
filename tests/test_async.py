@@ -59,7 +59,7 @@ class MyAsync2:
                self.thing == other.thing and \
                 self.next == other.next
 
-class MyClass2Loader(AsyncLoader[JsonType]):
+class MyClass2Loader(AsyncLoader[JsonType, MyAsync2]):
 
     def can_load(self, cls: type):
         return cls is MyAsync2

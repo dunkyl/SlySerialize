@@ -3,7 +3,7 @@ from .abc import Converter, Loader, DesCtx
 from .converters import *
 import asyncio
 
-_common = (
+_common: list[Converter[Any, JsonType]] = [
     JsonScalarConverter(),
     ListOrSetConverter(),
     TupleConverter(),
@@ -11,9 +11,10 @@ _common = (
     ToFromJsonConverter(),
     EnumConverter(),
     DatetimeConverter(),
-)
+]
 
-_special_loaders: list[Loader[JsonType]] = [
+# Loaders for types that have no concrete instances
+_special_loaders: list[Loader[JsonType, Any]] = [
     TypeVarLoader(),
     UnionLoader(),
     DelayedAnnotationLoader(),
@@ -33,7 +34,7 @@ COMMON_CONVERTER_UNSTRICT = ConverterCollection(
 )
 
 def from_json(cls: type[T], value: JsonType, \
-                      loader: Loader[JsonType] | None = None,
+                      loader: Loader[JsonType, T] | None = None,
                       allow_extra_keys: bool=False) -> T:
     '''Converts a value from JSON to a type T.
 
@@ -48,7 +49,7 @@ def from_json(cls: type[T], value: JsonType, \
     return context.des(value, cls)
 
 async def from_json_async(cls: type[T], value: JsonType,
-                            loader: Loader[JsonType] | None = None,
+                            loader: Loader[JsonType, T] | None = None,
                             allow_extra_keys: bool=False) -> T:
     '''Converts a value from JSON to a type T with support for async converters.'''
     if loader is None:
@@ -58,7 +59,7 @@ async def from_json_async(cls: type[T], value: JsonType,
             loader = COMMON_CONVERTER
     return await _recursive_await(DesCtx[JsonType](loader, only_sync=False).des(value, cls))
 
-def to_json(value: Any, converter: Converter[JsonType]|None=None) -> JsonType:
+def to_json(value: Any, converter: Converter[JsonType, Any]|None=None) -> JsonType:
     '''Converts a value to JSON.'''
     if converter is None:
         converter = COMMON_CONVERTER
