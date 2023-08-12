@@ -1,6 +1,6 @@
 [project]
 name = "SlySerialize"
-version = "0.0.1"
+version = "0.0.2"
 description = "Convert JSON-like data structures into nice Python objects."
 readme = "README.md"
 requires-python = ">=3.10"
