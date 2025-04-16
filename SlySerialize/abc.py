@@ -12,43 +12,43 @@ type JsonScalar = int | float | bool | str | None
 type JsonType = JsonScalar | Seq[JsonType] | Map[str, JsonType]
 type JsonMap = Map[str, JsonType]
     
-type DesCtx[Domain] = LoadingContext[Domain]
-type SerCtx[Domain] = UnloadingContext[Domain]
+type DesCtx[Stored] = LoadingContext[Stored, Any]
+type SerCtx[Stored] = UnloadingContext[Stored, Any]
 
-class LoadingContext[Domain]:
+class LoadingContext[Stored, Target]:
     'State for deserialization and recursion'
 
     type_vars: dict[str, type]
     parent_type: type[Any] | None
-    parent_deserializer: Loader[Domain]
+    parent_deserializer: Loader[Stored, Target]
     only_sync: bool
 
-    def __init__(self, converter: Loader[Domain], only_sync: bool):
+    def __init__(self, converter: Loader[Stored, Target], only_sync: bool):
         self.type_vars = {}
         self.parent_type = None
         self.only_sync = only_sync
         self.parent_deserializer = converter
 
-    def des[T](self, value: Domain, cls: TypeForm[T]) -> T:
+    def des(self, value: Stored, cls: TypeForm[Target]) -> Target:
         result = self.parent_deserializer.des(self, value, cls)
         if self.only_sync:
             if asyncio.isfuture(result) or asyncio.iscoroutine(result):
                 raise ValueError("Async converter used in sync context")
         return result
 
-class UnloadingContext[Domain]:
+class UnloadingContext[Stored, Target]:
     'State for serialization and recursion'
 
-    parent_serializer: Unloader[Domain]
+    parent_serializer: Unloader[Stored, Target]
 
-    def __init__(self, converter: Unloader[Domain]):
+    def __init__(self, converter: Unloader[Stored, Target]):
         self.parent_serializer = converter
 
-    def ser(self, value: Any) -> Domain:
+    def ser(self, value: Target) -> Stored:
         return self.parent_serializer.ser(self, value)
     
 
-class Unloader[Domain](ABC):
+class Unloader[Stored, Target](ABC):
     'Serializes one type or group of types'
 
     @abstractmethod
@@ -57,13 +57,13 @@ class Unloader[Domain](ABC):
         ...
 
     @abstractmethod
-    def ser(self, ctx: SerCtx[Domain], value: Any) -> Domain:
+    def ser(self, ctx: UnloadingContext[Stored, Target], value: Target) -> Stored:
         '''Convert a value to a domain-compatible type.
         
         Called only if `can_unload` returned `True` for `type(value)`.'''
         ...
 
-class Loader[Domain](ABC):
+class Loader[Stored, Target](ABC):
     'Deserializes one type or group of types'
 
     @abstractmethod
@@ -72,22 +72,22 @@ class Loader[Domain](ABC):
         ...
 
     @abstractmethod
-    def des[T](self, ctx: DesCtx[Domain], value: Domain, cls: TypeForm[T]) -> T:
+    def des(self, ctx: LoadingContext[Stored, Target], value: Stored, cls: TypeForm[Target]) -> Target:
         '''Convert a domain value to the specified type.
         
         Called only if `can_load` returned `True` for `cls`.'''
         ...
 
 
-class Converter[Domain](Unloader[Domain], Loader[Domain]):
-    'Both serializes and deserializes one type or group of types T to and from Domain'
+class Converter[Stored, Target](Unloader[Stored, Target], Loader[Stored, Target]):
+    'Both serializes and deserializes one type or group of types T to and from Stored'
     pass
 
 
-class AsyncLoader[Domain](Loader[Domain]):
+class AsyncLoader[Stored, Target](Loader[Stored, Target]):
     '''Deserializes one type or group of types asynchronously'''
 
     @abstractmethod
-    async def des[T](self, # type: ignore - async override is by design
-                  ctx: DesCtx[Domain], value: Domain, cls: TypeForm[T]) -> T: ... 
+    async def des(self, # type: ignore - async override is by design
+                  ctx: DesCtx[Stored], value: Stored, cls: TypeForm[Target]) -> Target: ... 
         

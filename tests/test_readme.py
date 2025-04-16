@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar, TypeAlias
 from dataclasses import dataclass
-from SlySerialize import from_json, to_json
+from SlySerialize import from_json, to_json, JsonType
 
 ListOfInts: TypeAlias = list[int]
 T = TypeVar("T")
@@ -24,7 +24,7 @@ def test_readme():
     my_obj = MyClass[int]([1, 2, 3], 42, (3.1, ["a"]), None, None)
 
     # dataclasses.asdict(my_obj)
-    serialized = {
+    serialized: JsonType = {
         "aliased": [1, 2, 3],   "generic": 42,
         "union":   None,        "delayed": None,
         "builtin": [3.1, ["a"]],

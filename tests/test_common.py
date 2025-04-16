@@ -199,14 +199,14 @@ def test_custom_converter():
         def __eq__(self, other: object):
             return isinstance(other, X) and self.xx == other.xx
 
-    class XLoader(Loader[JsonType]):
+    class XLoader(Loader[JsonType, X]):
 
         def can_load(self, cls: type): return cls is X
 
-        def des[T](self, ctx: DesCtx[JsonType], value: JsonType, cls: TypeForm[T]) -> T:
+        def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: TypeForm[X]) -> X:
             if not isinstance(value, int):
                 raise ValueError(f"expected int, got {value!r}")
-            return X(value) # type: ignore - TODO: add back the Loader codomain type arg?
+            return X(value)
 
     loader = COMMON_CONVERTER.with_(XLoader())
 
