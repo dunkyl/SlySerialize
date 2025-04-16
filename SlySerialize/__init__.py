@@ -14,4 +14,4 @@ from .abc import \
     SerCtx as SerCtx, \
     DesCtx as DesCtx
 
-from ._type_vars import JsonType as JsonType
+from .abc import JsonType as JsonType

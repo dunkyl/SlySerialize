@@ -2,6 +2,7 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from datetime import datetime, timezone
 from typing import Generic, TypeVar
+from typing_extensions import TypeForm
 from SlySerialize import Loader, DesCtx, JsonType, COMMON_CONVERTER, \
     from_json, to_json
 
@@ -41,7 +42,7 @@ def test_de_enum():
 
 def test_de_union():
     x = 1
-    assert x == from_json(int | str, x)
+    assert x == from_json(int | str, x) # type: ignore ## needs TypeForm
     assert x == to_json(x)
 
 def test_de_dataclass():
@@ -103,7 +104,7 @@ def test_de_dataclass_generic():
     assert asdict(x) == to_json(x)
 
 def test_de_datetime():
-    x = datetime.utcnow().astimezone(timezone.utc)
+    x = datetime.now(timezone.utc)
     x = x.replace(microsecond=x.microsecond - x.microsecond % 1000)
     assert x == from_json(datetime, to_json(x))
     assert x == from_json(datetime, x.timestamp())
@@ -185,7 +186,7 @@ def test_de_derived():
         'card': None, 'poll': None,
     }
 
-    from_json(DerivedDataclass|None, x)
+    from_json(DerivedDataclass|None, x) # TODO: diagnostic - what?
 
     assert x == to_json(from_json(DerivedDataclass|None, x))
 
@@ -198,14 +199,14 @@ def test_custom_converter():
         def __eq__(self, other: object):
             return isinstance(other, X) and self.xx == other.xx
 
-    class XLoader(Loader[JsonType, X]):
+    class XLoader(Loader[JsonType]):
 
         def can_load(self, cls: type): return cls is X
 
-        def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[X]) -> X:
+        def des[T](self, ctx: DesCtx[JsonType], value: JsonType, cls: TypeForm[T]) -> T:
             if not isinstance(value, int):
                 raise ValueError(f"expected int, got {value!r}")
-            return X(value)
+            return X(value) # type: ignore - TODO: add back the Loader codomain type arg?
 
     loader = COMMON_CONVERTER.with_(XLoader())
 

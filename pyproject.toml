@@ -1,12 +1,15 @@
 [project]
 name = "SlySerialize"
-version = "0.0.2"
+version = "0.9.0"
 description = "Convert JSON-like data structures into nice Python objects."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 license = { file="LICENSE" }
 authors = [{name="Dunkyl 🔣🔣"}]
-dependencies = []
+dependencies = [
+    
+    "typing-extensions>=4.13.2", # TODO: remove when 3.14b1
+]
 [project.optional-dependencies]
 dev = [
     # testing

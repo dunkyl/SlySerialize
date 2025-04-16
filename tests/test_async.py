@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import dataclass
+from typing_extensions import TypeForm
 from SlySerialize import AsyncLoader, DesCtx, from_json_async, JsonType
 from SlySerialize.converters import DataclassConverter, JsonScalarConverter, \
     ListOrSetConverter, LoaderCollection
@@ -59,19 +60,19 @@ class MyAsync2:
                self.thing == other.thing and \
                 self.next == other.next
 
-class MyClass2Loader(AsyncLoader[JsonType, MyAsync2]):
+class MyClass2Loader(AsyncLoader[JsonType]):
 
     def can_load(self, cls: type):
         return cls is MyAsync2
     
-    async def des(self, ctx: DesCtx[JsonType], value: JsonType, cls: type[MyAsync2]) -> MyAsync2:
+    async def des[T](self, ctx: DesCtx[JsonType], value: JsonType, cls: TypeForm[T]) -> T:
         if not isinstance(value, list):
             raise TypeError("Expected list")
         await asyncio.sleep(0.1)
         it = MyAsync2(value[-1], None) # type: ignore
         for v in reversed(value[:-1]):
             it = MyAsync2(v, it) # type: ignore
-        return it
+        return it # type: ignore
 
 async def test_async_converter():
 
@@ -91,7 +92,7 @@ async def test_async_converter_nested():
         other_member: list[int]
         more_async: list[MyAsync2]
 
-    json = {
+    json: JsonType = {
         'async_member': [3.5, 2.5, 1.5],
         'other_member': [1, 2, 3],
         'more_async': [[5.5, 5.5], [4.5, 4.5]]
